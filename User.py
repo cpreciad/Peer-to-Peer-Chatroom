@@ -11,7 +11,7 @@ import socket
 import json
 
 
-LOGIN_SERVER = ('carlos-mbp.dhcp.nd.edu', 9000)
+LOGIN_SERVER = ('student00.cse.nd.edu', 9000)
 BYTES = 1024
 HOST = ''
 PORT = 0
@@ -112,14 +112,21 @@ class User:
 
         json_req = {
             "username": self.username,
-            "purpose": "connect"
+            "purpose": "connect",
+            "ip": self.ip,
+            "port": self.port
         }
 
         req = json.dumps(json_req)
+        print(req)
         encoded_req = req.encode('utf-8')
 
+        # send connection message to SuperUser
         lead_sock.sendto(encoded_req, tuple(leader))
-        data, rec_addr = lead_sock.recvfrom(BYTES)
+
+        while True:
+            data, rec_addr = lead_sock.recvfrom(BYTES)
+            print(data)
 
 
 
