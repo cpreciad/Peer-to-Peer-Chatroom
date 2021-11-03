@@ -44,7 +44,9 @@ class SuperUser:
         '''Method to listen for incoming clients and add to chat system'''
 
         super_sock = socket.socket()
-
+        super_sock.bind((HOST, PORT))
+        super_sock.listen()
+        client_sock, addr = super_sock.accept()
 
 
     def send_message(self, message):
