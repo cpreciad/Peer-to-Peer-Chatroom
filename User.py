@@ -90,7 +90,6 @@ class User:
         data, rec_addr = login_sock.recvfrom(BYTES)
 
         res = data.decode('utf-8')
-        print(res)
         json_res = json.loads(res)
         
         if (json_res["status"] == "success"):
@@ -116,7 +115,6 @@ class User:
             "purpose": "connect"
         }
 
-        print(json_req)
         req = json.dumps(json_req)
         encoded_req = req.encode('utf-8')
 

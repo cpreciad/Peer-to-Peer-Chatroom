@@ -113,6 +113,7 @@ def run_server(leader_info):
     while True:
         data  = recieve_request(server_socket) 
         response_package, name_list = process_request(server_socket, data, leader_info, name_list)
+        print(name_list)
         send_response(server_socket, response_package)
 
 def usage():
