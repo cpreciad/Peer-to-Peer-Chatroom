@@ -8,15 +8,43 @@
 # chat system to allow for new User entry
 
 
+import socket
+
+HOST = ''
+PORT = 0
+
 class SuperUser:
 
     def __init__(self):
         '''Constructor for User objects'''
 
-        self.username = ""
-        self.location = (None, None)
+        self.username = "super_user"
         self.neighbors = {}
         self.message_table = {}
+
+        ip = socket.gethostbyname(socket.gethostname())
+        self.ip = ip
+
+        client_sock = socket.socket()
+        client_sock.bind((HOST, PORT))
+        _, self.port = client_sock.getsockname()
+
+
+    def print_user(self):
+        '''Method to print attributes of the SuperUser'''
+
+        print(f'Username:  {self.username}')
+        print(f'IP Addr:   {self.ip}')
+        print(f'Port:      {self.port}')
+        print(f'Neighbors: {self.neighbors}')
+        print(f'Messages:  {self.message_table}\n')
+
+
+    def add_user(self):
+        '''Method to listen for incoming clients and add to chat system'''
+
+        super_sock = socket.socket()
+
 
 
     def send_message(self, message):

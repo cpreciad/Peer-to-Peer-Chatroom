@@ -7,17 +7,23 @@
 # ChatService.py serves as the main runner file to initiate
 # the chat service
 
+import socket
+import SuperUser
+import User
+
 
 def main():
     '''Main runner function for service'''
 
     # TODO: Initialize SuperNode
-
-    # TODO: Initialize LoginServer
+    super_usr = SuperUser.SuperUser()
+    super_usr.print_user()
+    
+    new_usr = User.User()
+    new_usr.print_user()
+    new_usr.connect()
 
     # TODO: Add User nodes to system
-
-    pass
 
 
 if __name__ == '__main__':
