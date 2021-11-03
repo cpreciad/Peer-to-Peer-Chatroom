@@ -8,12 +8,19 @@
 # This server listens for new Users wishing to connect, and forwards 
 # inforation about the SuperUser
 
+# Imports
+import socket
+import json 
+import sys
 # Global Variables:
 HOST = ''
-PORT = 0
-BUFSIZ = 1024
+PORT = 9000
+BUFSIZ = 4096
 
-def socket_listen():
+SUPERUSER_PORT = 0 
+SUPERUSER_HOST = ''
+
+def socket_bind():
     '''
         Creates and returns a listening UDP socket
         
@@ -21,7 +28,12 @@ def socket_listen():
         Success: socket object
         Failure: None type
     '''
-    pass
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    
+    s.bind((HOST,PORT))
+
+    return s
 
 def recieve_request(server_socket):
     '''
@@ -29,44 +41,91 @@ def recieve_request(server_socket):
         the decoded request to the main loop for processing
         
         Return Values:
-        Success: decoded request from client
+        Success: dictionary with decoded request from client,
+                 client ip, and client port
         Failure: json string containing thrown error
     '''
-    pass
+    
+    data, address = server_socket.recvfrom(BUFSIZ)
+    
+    return {'request': data.decode('utf-8'), 'ip': address[0], 'port': int(address[1])}
 
-def process_request(request):
+def process_request(server_socket, data, leader_info, name_list):
     '''
         Converts the decoded request into a json object
         and create an encoded json response
 
         Return Values:
-        (client IP, client port, response)
+        (response, client IP, client port)
 
         response will vary based on the success or failure of parsing the request
         Successful response: b'{host: ~~~, port: ~~~}'
 
     '''
-    pass
+    
+    #TODO come up with different ways to process request 
+   
+    # reassign the name_list
+    request = json.loads(data['request'])
+    if request['username'] == 'super_user':
+        pass
+
+    if request['purpose'] == 'connect':
+        if request['username'] in name_list:
+            # send a request for a names list to the user
+            # if username in new name_list, respond with failure
+            message = {"status": "failure", "error": "username not unique" }
+            message = json.dumps(message)
+            message = message.encode('utf-8')
+            return (message, data['ip'], data['port'])
+
+        else:
+            # add the username to the list continue on
+            usernames.append(request['username'])
+
+    leader_ip, leader_port = leader_info 
+    
+    message = {"status": "success", "leader": (leader_ip, leader_port)}
+    message = json.dumps(message)
+    message = message.encode('utf-8')
+
+    return (message, data['ip'], data['port'])
+     
 
 def send_response(server_socket, response_package):
     #TODO may want to implement retries, but probably not since this is a server 
     '''
         Simply sends the response back to the client 
     '''
-    client_ip, client_port, response = response_package
-    pass
+    message, ip, port = response_package
+    server_socket.sendto(message, (ip, port))
 
-def main():
+def run_server(leader_info):
     
     # create a new listening socket 
-    server_socket = socket_listen()
+    server_socket = socket_bind()
+
+    # create a list of names
+    name_list = []
 
     # main while loop to listen for client requests
+    print(server_socket.getsockname())
     while True:
-        request  = recieve_request(server_socket) 
-        response_package = process_request(request)
+        data  = recieve_request(server_socket) 
+        print(data)
+        response_package = process_request(server_socket, data, leader_info, name_list)
         send_response(server_socket, response_package)
-        
+
+def usage():
+    print('Usage: ')
+    sys.exit(0)
+def main():
+    
+    if len(sys.argv) != 3:
+        usage()
+
+    run_server((sys.argv[1], int(sys.argv[2])))
+
 if __name__ == "__main__":
     main()
 
