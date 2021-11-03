@@ -19,8 +19,7 @@ def main():
     # TODO: Initialize SuperNode
     super_usr = SuperUser.SuperUser()
     super_usr.print_user()
-    
-    run_server((super_usr.ip, super_usr.port))
+    super_usr.add_user()
 
 
 if __name__ == '__main__':

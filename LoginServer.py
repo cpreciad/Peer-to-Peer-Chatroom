@@ -117,14 +117,17 @@ def run_server(leader_info):
         send_response(server_socket, response_package)
 
 def usage():
-    print('Usage: ')
+    print('Usage: [SUPERHOST] [SUPERPORT]')
     sys.exit(0)
+
+
 def main():
     
     if len(sys.argv) != 3:
         usage()
 
     run_server((sys.argv[1], int(sys.argv[2])))
+
 
 if __name__ == "__main__":
     main()
