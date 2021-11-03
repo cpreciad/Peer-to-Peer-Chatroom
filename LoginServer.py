@@ -81,7 +81,7 @@ def process_request(server_socket, data, leader_info, name_list):
 
         else:
             # add the username to the list continue on
-            usernames.append(request['username'])
+            name_list.append(request['username'])
 
     leader_ip, leader_port = leader_info 
     
@@ -89,7 +89,7 @@ def process_request(server_socket, data, leader_info, name_list):
     message = json.dumps(message)
     message = message.encode('utf-8')
 
-    return (message, data['ip'], data['port'])
+    return ((message, data['ip'], data['port']), name_list)
      
 
 def send_response(server_socket, response_package):
@@ -112,8 +112,7 @@ def run_server(leader_info):
     print(server_socket.getsockname())
     while True:
         data  = recieve_request(server_socket) 
-        print(data)
-        response_package = process_request(server_socket, data, leader_info, name_list)
+        response_package, name_list = process_request(server_socket, data, leader_info, name_list)
         send_response(server_socket, response_package)
 
 def usage():

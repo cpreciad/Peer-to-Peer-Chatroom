@@ -10,6 +10,7 @@
 import socket
 import SuperUser
 import User
+from  LoginServer import run_server
 
 
 def main():
@@ -19,11 +20,7 @@ def main():
     super_usr = SuperUser.SuperUser()
     super_usr.print_user()
     
-    new_usr = User.User()
-    new_usr.print_user()
-    new_usr.connect()
-
-    # TODO: Add User nodes to system
+    run_server((super_usr.ip, super_usr.port))
 
 
 if __name__ == '__main__':
