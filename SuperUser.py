@@ -28,9 +28,10 @@ class SuperUser:
         ip = socket.gethostbyname(socket.gethostname())
         self.ip = ip
 
-        client_sock = socket.socket()
-        client_sock.bind((HOST, PORT))
-        _, self.port = client_sock.getsockname()
+        serv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        serv_sock.bind((HOST,PORT))
+        _, self.port = serv_sock.getsockname()
+        self.serv_sock = serv_sock
 
 
     def print_user(self):
@@ -46,24 +47,18 @@ class SuperUser:
     def add_users(self):
         '''Method to listen for incoming clients and add to chat system'''
 
-        super_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        super_sock.bind((self.ip, self.port))
-
+        print(f'SuperUser: Listening on port {self.port}...')
         while True:
-            data, rec_addr = super_sock.recvfrom(BYTES)
+            data, rec_addr = self.serv_sock.recvfrom(BYTES)
             req = json.loads(data.decode('utf-8'))
-            print(req)
+            print(f'{req["username"]}: {req}')
             location = (req["ip"], req["port"])
             json_res = {
                 "status": "success",
                 "message": "Connected to chat room"
             }
             res = json.dumps(json_res).encode('utf-8')
-            print(res)
-            print(location)
-            print("sending message")
-            super_sock.sendto(res, location)
-            print("sent")
+            self.serv_sock.sendto(res, location)
 
 
     def send_message(self, message):

@@ -16,7 +16,7 @@ from  LoginServer import run_server
 def main():
     '''Main runner function for service'''
 
-    # TODO: Initialize SuperNode
+    # Initialize SuperNode
     super_usr = SuperUser.SuperUser()
     super_usr.print_user()
     super_usr.add_user()
