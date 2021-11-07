@@ -94,8 +94,13 @@ class User:
         # send connection message to SuperUser
         self.sock.sendto(encoded_req, tuple(leader))
         data, rec_addr = self.sock.recvfrom(BYTES)
-        data = data.decode('utf-8')
-        print(f'{self.username}: {data}')
+        data = json.loads(data.decode('utf-8'))
+        self.neighbors["prev"] = leader
+        self.neighbors["next_1"] = data["next_1"]
+        self.neighbors["next_2"] = data["next_2"]
+        print(f'SuperUser: {data}')
+
+        print(self.neighbors)
 
 
     def disconnect(self):
@@ -111,4 +116,36 @@ class User:
     def direct_message(self, username, message):
         '''Send a direct message to a target user'''
         pass
+
+
+    def temp_listen(self):
+        
+        while True:
+            data, addr = self.sock.recvfrom(BYTES)
+            message = json.loads(data.decode('utf-8'))
+            if (message["purpose"] and message["purpose"] == "update_pointers"):
+                self.neighbors["prev"] = message["prev"]
+                if self.neighbors["next_2"] == None:
+                    # next next pointer is the new node
+                    self.neighbors["next_2"] = message["prev"]
+                    # next pointer is the leader
+                    self.neighbors["next_1"] = addr
+        
+                res = {
+                    "status": "success",
+                    "curr_next": self.neighbors["next_1"]
+                }
+
+                res = json.dumps(res).encode('utf-8')
+                self.sock.sendto(res, addr)
+            
+            if (message["purpose"] and message["purpose"] == "update_last_node"):
+                self.neighbors["next_2"] = message["next_2"]
+                res = {
+                    "status": "success",
+                }
+                res = json.dumps(res).encode('utf-8')
+                self.sock.sendto(res, addr)
+
+            print(self.neighbors)
 
