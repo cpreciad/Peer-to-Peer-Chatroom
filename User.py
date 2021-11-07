@@ -11,7 +11,7 @@ import socket
 import json
 
 
-LOGIN_SERVER = ('student00.cse.nd.edu', 9000)
+LOGIN_SERVER = ('student00.cse.nd.edu', 3000)
 BYTES = 1024
 HOST = ''
 PORT = 0
@@ -29,10 +29,12 @@ class User:
 
         ip = socket.gethostbyname(socket.gethostname())
         self.ip = ip
-        
-        client_sock = socket.socket()
-        client_sock.bind((HOST, PORT))
-        _, self.port = client_sock.getsockname()
+       
+        # "server" socket to listen for other peer's messages
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind((HOST,PORT))
+        _, self.port = sock.getsockname()
+        self.sock = sock
 
 
     def print_user(self):
@@ -42,40 +44,11 @@ class User:
         print(f'IP Addr:   {self.ip}')
         print(f'Port:      {self.port}') 
         print(f'Neighbors: {self.neighbors}')
-        print(f'Messages:  {self.message_table}')
-
-
-    def connect_to_host(self, addr):
-        '''Method to set up UDP connection with a given host and port'''
-
-        host, port = addr
-
-        sock = None
-        sockaddr = None
-
-        for res in socket.getaddrinfo(host, port, socket.AF_UNSPEC, 
-            socket.SOCK_DGRAM, 0, socket.AI_PASSIVE):
-            
-            family, s_type, proto, _, sockaddr = res
-
-            # return the socket and socket address
-            sock = socket.socket(family, s_type, proto)
-
-            return sock, sockaddr
-
-        if not sock or not sockaddr:
-            print(f'{self.username}: Could not connect to ({host},{port})')     
-            return None
+        print(f'Messages:  {self.message_table}\n')
 
 
     def connect_to_login(self):
         '''Method to set up UDP connection with LoginServer'''
-        
-        connection = self.connect_to_host(LOGIN_SERVER)
-        if not connection:
-            return
-
-        login_sock, sockaddr = connection
 
         json_req = {
             "username": self.username,
@@ -85,12 +58,12 @@ class User:
         req = json.dumps(json_req)
         encoded_req = req.encode('utf-8')
 
-        # TODO: add try/except
-        login_sock.sendto(encoded_req, sockaddr)
-        data, rec_addr = login_sock.recvfrom(BYTES)
+        self.sock.sendto(encoded_req, LOGIN_SERVER)
+        data, _ = self.sock.recvfrom(BYTES)
 
         res = data.decode('utf-8')
         json_res = json.loads(res)
+        print(f'LoginServer: {json_res}')
         
         if (json_res["status"] == "success"):
             return json_res["leader"]
@@ -103,12 +76,9 @@ class User:
         '''Allow user to enter chat ring'''
    
         leader = self.connect_to_login()
-        print(f'Leader: {leader}')
-        lead_connection = self.connect_to_host(leader) 
-        if not lead_connection:
+        if not leader:
+            print(f'{self.username}: Connection to LoginServer failed')
             return
-
-        lead_sock, _ = lead_connection
 
         json_req = {
             "username": self.username,
@@ -118,16 +88,14 @@ class User:
         }
 
         req = json.dumps(json_req)
-        print(req)
+        print(f'{self.username}: {req}')
         encoded_req = req.encode('utf-8')
 
         # send connection message to SuperUser
-        lead_sock.sendto(encoded_req, tuple(leader))
-
-        while True:
-            data, rec_addr = lead_sock.recvfrom(BYTES)
-            print(data)
-
+        self.sock.sendto(encoded_req, tuple(leader))
+        data, rec_addr = self.sock.recvfrom(BYTES)
+        data = data.decode('utf-8')
+        print(f'{self.username}: {data}')
 
 
     def disconnect(self):

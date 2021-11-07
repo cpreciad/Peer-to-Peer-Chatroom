@@ -14,7 +14,7 @@ import json
 import sys
 # Global Variables:
 HOST = ''
-PORT = 9000
+PORT = 3000
 BUFSIZ = 4096
 
 SUPERUSER_PORT = 0 
@@ -35,7 +35,7 @@ def socket_bind():
 
     return s
 
-def recieve_request(server_socket):
+def receive_request(server_socket):
     '''
         Waits for new requests to come in from clients, and returns
         the decoded request to the main loop for processing
@@ -111,7 +111,7 @@ def run_server(leader_info):
     # main while loop to listen for client requests
     print(server_socket.getsockname())
     while True:
-        data  = recieve_request(server_socket) 
+        data  = receive_request(server_socket) 
         response_package, name_list = process_request(server_socket, data, leader_info, name_list)
         print(name_list)
         send_response(server_socket, response_package)
