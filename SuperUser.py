@@ -114,7 +114,6 @@ class SuperUser:
 
             res = json.dumps(json_res).encode('utf-8')
             self.serv_sock.sendto(res, location)
-            print(self.neighbors)
 
 
     def send_message(self, message):
