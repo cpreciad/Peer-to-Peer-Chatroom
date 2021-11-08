@@ -34,6 +34,8 @@ class User:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((HOST,PORT))
         _, self.port = sock.getsockname()
+        # failure domain of 30 seconds
+        sock.settimeout(30)
         self.sock = sock
 
 
@@ -110,42 +112,125 @@ class User:
 
     def send_message(self, message):
         '''Send a global message to all nodes in ring'''
-        pass
+
+        message = {
+            "username": self.username,
+            "purpose": "global_message",
+            "message": message,
+            "count": self.message_count
+        }
+
+        self.message_count += 1;
+        
+        req = json.dumps(message).encode('utf-8');
+        # send global message to next neighbor
+        self.sock.sendto(req, self.neighbors["next_1"]);
+        data = self.sock.recv(BYTES);
+
 
 
     def direct_message(self, username, message):
         '''Send a direct message to a target user'''
-        pass
+
+        message = {
+            "username": self.username,
+            "purpose": "direct",
+            "message": message,
+            "count": self.message_count,
+            "ip": self.ip,
+            "port": self.port,
+            "target": username
+        }
+
+        self.message_count += 1;
+        
+        req = json.dumps(message).encode('utf-8');
+        # send direct message to next neighbor
+        self.sock.sendto(req, self.neighbors["next_1"]);
+        data = self.sock.recv(BYTES);
 
 
+    def update_pointers(self, purpose, message, leader):
+        '''Update pointers to accomodate new nodes'''
+
+        if (purpose == "update_pointers"):
+            self.neighbors["prev"] = message["prev"]
+            if self.neighbors["next_2"] == None:
+                # next next pointer is the new node
+                self.neighbors["next_2"] = message["prev"]
+                # next pointer is the leader
+                self.neighbors["next_1"] = leader
+    
+            res = {
+                "status": "success",
+                "curr_next": self.neighbors["next_1"]
+            }
+
+            res = json.dumps(res).encode('utf-8')
+            self.sock.sendto(res, leader)
+
+        # update last node in ring to include new node
+        else:
+            self.neighbors["next_2"] = message["next_2"]
+            res = {
+                "status": "success",
+            }
+            res = json.dumps(res).encode('utf-8')
+            self.sock.sendto(res, leader)
+    
+
+    def handle_direct(self, message):
+        '''Handling the receival of a direct message'''
+
+        # check if username matches
+        if (self.username == message["username"]):
+            source = tuple(message["ip"], message["port"])
+            res = {
+                "username": self.username,
+                "status": "listening"
+            }
+
+            json_res = json.dumps(res).encode('utf-8')
+            self.sock.sendto(json_res, source)
+
+        # otherwise forward message to next
+        else:
+            # first send acknowledgement to sender
+            res = {
+                "username": self.username,
+                "purpose": "acknowledgement"
+            }
+            ack = json.dumps(res).encode('utf-8')
+            sender = tuple(message["ip"], message["port"])
+            self.sock.sendto(ack, sender)
+
+            # forward along message
+            message = json.dumps(message).encode('utf-8')
+            self.sock.sendto(message, self.neighbors["next_1"])
+
+            # block until receiving acknowledgement
+            while True:
+                data = self.sock.recv(bytes)
+                ack = json.loads(data.decode('utf-8'))
+                if (ack["purpose"] and ack["purpose"] == "acknowledgement"):
+                    break
+
+    
     def temp_listen(self):
+        '''Function to listen for incoming messages'''
         
         while True:
             data, addr = self.sock.recvfrom(BYTES)
             message = json.loads(data.decode('utf-8'))
-            if (message["purpose"] and message["purpose"] == "update_pointers"):
-                self.neighbors["prev"] = message["prev"]
-                if self.neighbors["next_2"] == None:
-                    # next next pointer is the new node
-                    self.neighbors["next_2"] = message["prev"]
-                    # next pointer is the leader
-                    self.neighbors["next_1"] = addr
-        
-                res = {
-                    "status": "success",
-                    "curr_next": self.neighbors["next_1"]
-                }
-
-                res = json.dumps(res).encode('utf-8')
-                self.sock.sendto(res, addr)
+            if (message["purpose"]):
+                purpose = message["purpose"]
+                # update pointers for a new node
+                if (purpose == "update_pointers" or purpose == "update_last_node"):
+                    self.update_pointers(purpose, message, addr)
             
-            if (message["purpose"] and message["purpose"] == "update_last_node"):
-                self.neighbors["next_2"] = message["next_2"]
-                res = {
-                    "status": "success",
-                }
-                res = json.dumps(res).encode('utf-8')
-                self.sock.sendto(res, addr)
+                # direct message
+                elif (purpose == "direct"):
+                    self.handle_direct(message)
 
             print(self.neighbors)
 

@@ -109,10 +109,12 @@ def run_server(leader_info):
     name_list = []
 
     # main while loop to listen for client requests
-    print(server_socket.getsockname())
+    _, port = server_socket.getsockname()
+    print(f'LoginServer listening on port {port}...')
     while True:
         data  = receive_request(server_socket) 
         response_package, name_list = process_request(server_socket, data, leader_info, name_list)
+        print('Users in Chat Room: ', end='')
         print(name_list)
         send_response(server_socket, response_package)
 
