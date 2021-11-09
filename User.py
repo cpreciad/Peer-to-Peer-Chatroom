@@ -16,6 +16,10 @@ BYTES = 1024
 HOST = ''
 PORT = 0
 
+def hash_data(data):
+    return int(hashlib.md5(data.encode('ascii')).hexdigest(), 16) 
+
+
 class User:
 
     def __init__(self):
@@ -147,49 +151,8 @@ class User:
         '''
         self.display_queue(hashed_data)
 
-        message = {
-            "username": self.username,
-            "purpose": "global_message",
-            "message": message,
-            "count": self.message_count
-        }
-
-        self.message_count += 1;
         
-        req = json.dumps(message).encode('utf-8');
-        # send global message to next neighbor
-        self.sock.sendto(req, self.neighbors["next_1"]);
-        data = self.sock.recv(BYTES);
 
-
-    def direct_message(self, username, message):
-        '''Send a direct message to a target user'''
-        pass
-
-    def send_internal(self):
-        ''' Internal method to send messages and wait for responses
-            
-            May have the additional responsibility of detecting if a neighbor has crashed
-        '''
-        #  socket to send or forward messages
-        messaging_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-        while True:
-            if self.message_queue != []:
-                
-                next_message = self.message_queue.pop(0) 
-                # TODO send the next message to this users next neighbor
-                messaging_sock.sendto(next_message,self.neighbors['next_1'])
-
-    def display_internal(self):
-        '''Internal method to remove the messsage from the queue and display the message'''
-
-        while True:
-            if self.display_queue != []:
-                next_message = self.display_queue.pop(0)
-                print(next_messsage)
-                # verify that the message id is in the 
-                # pending_table
 
     def direct_message(self, username, message):
         '''Send a direct message to a target user'''
@@ -198,13 +161,11 @@ class User:
             "username": self.username,
             "purpose": "direct",
             "message": message,
-            "count": self.message_count,
             "ip": self.ip,
             "port": self.port,
             "target": username
         }
 
-        self.message_count += 1;
         
         req = json.dumps(message).encode('utf-8');
         # send direct message to next neighbor
@@ -296,6 +257,31 @@ class User:
 
             print(self.neighbors)
 
+    def send_internal(self):
+        ''' Internal method to send messages and wait for responses
+            
+            May have the additional responsibility of detecting if a neighbor has crashed
+        '''
+        #  socket to send or forward messages
+        messaging_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        while True:
+            if self.message_queue != []:
+                
+                next_message = self.message_queue.pop(0) 
+                # TODO send the next message to this users next neighbor
+                messaging_sock.sendto(next_message,self.neighbors['next_1'])
+
+    def display_internal(self):
+        '''Internal method to remove the messsage from the queue and display the message'''
+
+        while True:
+            if self.display_queue != []:
+                next_message = self.display_queue.pop(0)
+                print(self.pending_data[next_messsage])
+                # verify that the message id is in the 
+                # pending_table
+
     def listen_internal(self):
         # socket for forwarding acknowledgements
         ack_sock =  socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -316,7 +302,7 @@ class User:
                     json_req = {
                         "username"    : self.username,
                         "purpose"     : "acknowledgement",
-                        " message_id" : hash_request(decoded_data) 
+                        " message_id" : hash_data(decoded_data) 
                     }
                     req = json.dumps(json_req)
                     encoded_req = req.encode('utf-8')
@@ -324,6 +310,7 @@ class User:
                     ack_sock.sendto(data, self.neighbors['prev']) 
                     
                 else:
+                    self.pending_table[hash_data(decoded_data)] = request
                     self.send_message(request['message'])
 
             if request['purpose'] == 'acknowledgement':
