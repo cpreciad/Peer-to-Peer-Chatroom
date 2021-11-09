@@ -13,10 +13,10 @@ import hashlib
 import queue
 
 
-LOGIN_SERVER = ('carlos-mbp.dhcp.nd.edu', 3000)
+LOGIN_SERVER = ('student11.cse.nd.edu', 9000)
 BYTES = 1024
 HOST = ''
-PORT = 0
+PORT = 9020
 
 def hash_data(data):
     return int(hashlib.md5(data.encode('ascii')).hexdigest(), 16) 
