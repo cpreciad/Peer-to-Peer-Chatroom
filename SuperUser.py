@@ -16,7 +16,7 @@ import hashlib
 import queue
 
 HOST = ''
-PORT = 0
+PORT = 9030
 BYTES = 1024
 
 def hash_data(data):

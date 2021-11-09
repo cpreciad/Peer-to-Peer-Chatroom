@@ -14,7 +14,7 @@ import json
 import sys
 # Global Variables:
 HOST = ''
-PORT = 3000
+PORT = 9000
 BUFSIZ = 4096
 
 SUPERUSER_PORT = 0 
