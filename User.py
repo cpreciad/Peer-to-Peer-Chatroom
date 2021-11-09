@@ -10,6 +10,7 @@ import threading
 import socket
 import json
 import hashlib
+import queue
 
 
 LOGIN_SERVER = ('carlos-mbp.dhcp.nd.edu', 3000)
@@ -30,8 +31,9 @@ class User:
         self.neighbors = {} # prev, next_1, next_2
         self.friends = {}
         self.pending_table = {} # pending
-        self.message_queue = [] 
-        self.display_queue = [] # history
+        self.message_queue = queue.Queue() 
+        self.display_queue = queue.Queue() # history
+
         ip = socket.gethostbyname(socket.gethostname())
         self.ip = ip
        
@@ -39,8 +41,6 @@ class User:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((HOST,PORT))
         _, self.port = sock.getsockname()
-        # failure domain of 30 seconds
-        sock.settimeout(30)
         self.sock = sock
 
         #  socket to send or forward messages
@@ -141,19 +141,8 @@ class User:
         req = json.dumps(json_req)
         
         encoded_req = req.encode('utf-8')
-
-        self.message_queue.append(encoded_req)
-
-    def display_message(self, hashed_data):
-        ''' add the request into the display message queue
-            
-            decode the message and put the string representation of the 
-            request into the display_list
-        '''
-        self.display_queue(hashed_data)
-
-        
-
+        self.pending_table[hash_data(req)] = json_req
+        self.message_queue.put(encoded_req)
 
     def direct_message(self, username, message):
         '''Send a direct message to a target user'''
@@ -256,7 +245,6 @@ class User:
                 elif (purpose == "direct"):
                     self.handle_direct(message)
 
-            print(self.neighbors)
 
     def send_internal(self):
         ''' Internal method to send messages and wait for responses
@@ -268,7 +256,8 @@ class User:
 
         while True:
             if self.message_queue != []:
-                next_message = self.message_queue.pop(0) 
+                next_message = self.message_queue.get() 
+
                 # TODO send the next message to this users next neighbor
                 messaging_sock.sendto(next_message, tuple(self.neighbors['next_1']))
 
@@ -277,8 +266,8 @@ class User:
 
         while True:
             if self.display_queue != []:
-                next_message = self.display_queue.pop(0)
-                print(self.pending_data[next_messsage])
+                next_message = self.display_queue.get()
+                print(self.pending_table[next_message])
                 # verify that the message id is in the 
                 # pending_table
 
@@ -288,12 +277,12 @@ class User:
         
         # main listening loop
         while True:
-            data = self.sock.recv(BYTES)
+            data, addr = self.sock.recvfrom(BYTES)
             decoded_data = data.decode('utf-8')
             request = json.loads(decoded_data)
-            print(request)
+            purpose = request['purpose']
             # process the request accordingly
-            if request['purpose'] == 'global':
+            if purpose == 'global':
                 # simply add the request to the message queue and 
                 # let the main program handle this, unless its from itself,
                 # then start the acknowledgement test
@@ -302,27 +291,37 @@ class User:
                     json_req = {
                         "username"    : self.username,
                         "purpose"     : "acknowledgement",
-                        " message_id" : hash_data(decoded_data) 
+                        "message_id" : hash_data(decoded_data) 
                     }
                     req = json.dumps(json_req)
                     encoded_req = req.encode('utf-8')
                     #TODO message to prev neighbor
-                    ack_sock.sendto(data, tuple(self.neighbors['prev']))
-                    
+                    ack_sock.sendto(encoded_req, tuple(self.neighbors['prev']))
+ 
                 else:
                     self.pending_table[hash_data(decoded_data)] = request
-                    self.message_queue.append(data)
+                    self.message_queue.put(data)
 
-            if request['purpose'] == 'acknowledgement':
-                self.display_message(decoded_data)
+            elif purpose == 'acknowledgement':
+                # put the message hash into the queue
+                self.display_queue.put(request['message_id'])
                 if request['username'] == self.username:
                     # stop forwarding the acknowledgement along
                     continue
                 else:
                     #TODO move along the acknowledgement
                     ack_sock.sendto(data, tuple(self.neighbors['prev']))
+            
+            elif purpose == 'direct':
+                pass
+            elif purpose == 'dm_response':
+                pass
 
-            if request['purpose'] == 'direct':
-                pass
-            if request['purpose'] == 'dm_response':
-                pass
+            # update pointers for a new node
+            elif (purpose == "update_pointers" or purpose == "update_last_node"):
+                self.update_pointers(purpose, request, addr)
+            
+            # direct message
+            elif (purpose == "direct"):
+                self.handle_direct(request)
+
