@@ -9,6 +9,7 @@
 import threading
 import socket
 import json
+import hashlib
 
 
 LOGIN_SERVER = ('carlos-mbp.dhcp.nd.edu', 3000)
@@ -267,10 +268,9 @@ class User:
 
         while True:
             if self.message_queue != []:
-                
                 next_message = self.message_queue.pop(0) 
                 # TODO send the next message to this users next neighbor
-                messaging_sock.sendto(next_message,self.neighbors['next_1'])
+                messaging_sock.sendto(next_message, tuple(self.neighbors['next_1']))
 
     def display_internal(self):
         '''Internal method to remove the messsage from the queue and display the message'''
@@ -291,7 +291,7 @@ class User:
             data = self.sock.recv(BYTES)
             decoded_data = data.decode('utf-8')
             request = json.loads(decoded_data)
-
+            print(request)
             # process the request accordingly
             if request['purpose'] == 'global':
                 # simply add the request to the message queue and 
@@ -307,11 +307,11 @@ class User:
                     req = json.dumps(json_req)
                     encoded_req = req.encode('utf-8')
                     #TODO message to prev neighbor
-                    ack_sock.sendto(data, self.neighbors['prev']) 
+                    ack_sock.sendto(data, tuple(self.neighbors['prev']))
                     
                 else:
                     self.pending_table[hash_data(decoded_data)] = request
-                    self.send_message(request['message'])
+                    self.message_queue.append(data)
 
             if request['purpose'] == 'acknowledgement':
                 self.display_message(decoded_data)
@@ -320,7 +320,7 @@ class User:
                     continue
                 else:
                     #TODO move along the acknowledgement
-                    ack_sock.sendto(data, self.neighbors['prev'])
+                    ack_sock.sendto(data, tuple(self.neighbors['prev']))
 
             if request['purpose'] == 'direct':
                 pass
