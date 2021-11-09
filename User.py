@@ -6,7 +6,7 @@
 #
 # The User class defines a node in the chat system
 # It serves as the abstraction template for basic functionality
-
+import threading
 import socket
 import json
 
@@ -22,12 +22,11 @@ class User:
         '''Constructor for User objects'''
 
         self.username = input("Enter your username: ")
-        self.neighbors = {}
+        self.neighbors = {} # prev, next_1, next_2
         self.friends = {}
-        self.pending_table = {}
-        self.message_count = 0
-        self.message_queue = []
-
+        self.pending_table = {} # pending
+        self.message_queue = [] 
+        self.display_queue = [] # history
         ip = socket.gethostbyname(socket.gethostname())
         self.ip = ip
        
@@ -104,9 +103,16 @@ class User:
 
         print(self.neighbors)
 
-        # set up thread to recieve messages
-        #listen_thread = threading.Thread(target = listen_internal, daemon = True)
-        #listen_thread.start()
+        # set up threads for recieving messages, sending messages, and displaying messages
+        listen_thread = threading.Thread(target = self.listen_internal, daemon = True)
+        listen_thread.start()
+        
+        send_thread = threading.Thread(target = self.send_internal, daemon = True)
+        send_thread.start()
+
+        display_thread = threading.Thread(target = self.display_internal, daemon = True)
+        display_thread.start()
+
     
     def disconnect(self):
         '''Allow user to exit chat ring'''
@@ -114,7 +120,32 @@ class User:
 
 
     def send_message(self, message):
-        '''Send a global message to all nodes in ring'''
+        ''' Send a global message to all nodes in ring
+            
+            really just an abstraction for adding a message to a message queue
+            encodes the message and add it to the message queue
+        '''
+        json_req = {
+            "username": self.username,
+            "purpose" : "global",
+            "message" : message, 
+            "ip"      : self.ip,
+            "port"    : self.port
+        }
+
+        req = json.dumps(json_req)
+        
+        encoded_req = req.encode('utf-8')
+
+        self.message_queue.append(encoded_req)
+
+    def display_message(self, hashed_data):
+        ''' add the request into the display message queue
+            
+            decode the message and put the string representation of the 
+            request into the display_list
+        '''
+        self.display_queue(hashed_data)
 
         message = {
             "username": self.username,
@@ -131,6 +162,34 @@ class User:
         data = self.sock.recv(BYTES);
 
 
+    def direct_message(self, username, message):
+        '''Send a direct message to a target user'''
+        pass
+
+    def send_internal(self):
+        ''' Internal method to send messages and wait for responses
+            
+            May have the additional responsibility of detecting if a neighbor has crashed
+        '''
+        #  socket to send or forward messages
+        messaging_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        while True:
+            if self.message_queue != []:
+                
+                next_message = self.message_queue.pop(0) 
+                # TODO send the next message to this users next neighbor
+                messaging_sock.sendto(next_message,self.neighbors['next_1'])
+
+    def display_internal(self):
+        '''Internal method to remove the messsage from the queue and display the message'''
+
+        while True:
+            if self.display_queue != []:
+                next_message = self.display_queue.pop(0)
+                print(next_messsage)
+                # verify that the message id is in the 
+                # pending_table
 
     def direct_message(self, username, message):
         '''Send a direct message to a target user'''
@@ -237,3 +296,46 @@ class User:
 
             print(self.neighbors)
 
+    def listen_internal(self):
+        # socket for forwarding acknowledgements
+        ack_sock =  socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        
+        # main listening loop
+        while True:
+            data = self.sock.recv(BYTES)
+            decoded_data = data.decode('utf-8')
+            request = json.loads(decoded_data)
+
+            # process the request accordingly
+            if request['purpose'] == 'global':
+                # simply add the request to the message queue and 
+                # let the main program handle this, unless its from itself,
+                # then start the acknowledgement test
+                if request['username'] == self.username:
+                    # forward the acknowledgement message
+                    json_req = {
+                        "username"    : self.username,
+                        "purpose"     : "acknowledgement",
+                        " message_id" : hash_request(decoded_data) 
+                    }
+                    req = json.dumps(json_req)
+                    encoded_req = req.encode('utf-8')
+                    #TODO message to prev neighbor
+                    ack_sock.sendto(data, self.neighbors['prev']) 
+                    
+                else:
+                    self.send_message(request['message'])
+
+            if request['purpose'] == 'acknowledgement':
+                self.display_message(decoded_data)
+                if request['username'] == self.username:
+                    # stop forwarding the acknowledgement along
+                    continue
+                else:
+                    #TODO move along the acknowledgement
+                    ack_sock.sendto(data, self.neighbors['prev'])
+
+            if request['purpose'] == 'direct':
+                pass
+            if request['purpose'] == 'dm_response':
+                pass

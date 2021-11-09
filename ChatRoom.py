@@ -16,8 +16,10 @@ def main():
     new_usr = User.User()
     new_usr.print_user()
     new_usr.connect()
-    new_usr.temp_listen()
-
+    
+    while True:
+        message = input('> ')
+        new_usr.send_message(message)
 
 if __name__ == '__main__':
     main()
