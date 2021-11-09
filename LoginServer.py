@@ -74,10 +74,10 @@ def process_request(server_socket, data, leader_info, name_list):
         if request['username'] in name_list:
             # send a request for a names list to the user
             # if username in new name_list, respond with failure
-            message = {"status": "failure", "error": "username not unique" }
+            message = {"status": "failure", "error": "un-unique" }
             message = json.dumps(message)
             message = message.encode('utf-8')
-            return (message, data['ip'], data['port'])
+            return ((message, data['ip'], data['port']), name_list)
 
         else:
             # add the username to the list continue on
