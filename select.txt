@@ -1,0 +1,249 @@
+#!/usr/bin/env python3
+
+# User.py
+# Authors: Kristen Friday, Carlo Preciado
+# Date: November 1, 2021
+#
+# The User class defines a node in the chat system
+# It serves as the abstraction template for basic functionality
+
+import socket
+import json
+import select
+import sys
+
+
+LOGIN_SERVER = ('carlos-mbp.dhcp.nd.edu', 3000)
+BYTES = 1024
+HOST = ''
+PORT = 0
+
+class User:
+
+    def __init__(self):
+        '''Constructor for User objects'''
+
+        self.username = input("Enter your username: ")
+        self.neighbors = {}
+        self.friends = {}
+        self.message_table = {}
+        self.message_count = 0
+
+        ip = socket.gethostbyname(socket.gethostname())
+        self.ip = ip
+       
+        # "server" socket to listen for other peer's messages
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind((HOST,PORT))
+        _, self.port = sock.getsockname()
+        self.sock = sock
+
+
+    def print_user(self):
+        '''Method to print attributes of the User'''                              
+
+        print(f'Username:  {self.username}')
+        print(f'IP Addr:   {self.ip}')
+        print(f'Port:      {self.port}') 
+        print(f'Neighbors: {self.neighbors}')
+        print(f'Messages:  {self.message_table}\n')
+
+
+    def connect_to_login(self):
+        '''Method to set up UDP connection with LoginServer'''
+
+        json_req = {
+            "username": self.username,
+            "purpose": "connect"
+        }
+
+        req = json.dumps(json_req)
+        encoded_req = req.encode('utf-8')
+
+        self.sock.sendto(encoded_req, LOGIN_SERVER)
+        data, _ = self.sock.recvfrom(BYTES)
+
+        res = data.decode('utf-8')
+        json_res = json.loads(res)
+        print(f'LoginServer: {json_res}')
+        
+        if (json_res["status"] == "success"):
+            return json_res["leader"]
+        else:
+            print(json_res["error"])
+            return None
+    
+
+    def connect(self):
+        '''Allow user to enter chat ring'''
+   
+        leader = self.connect_to_login()
+        if not leader:
+            print(f'{self.username}: Connection to LoginServer failed')
+            return
+
+        json_req = {
+            "username": self.username,
+            "purpose": "connect",
+            "ip": self.ip,
+            "port": self.port
+        }
+
+        req = json.dumps(json_req)
+        print(f'{self.username}: {req}')
+        encoded_req = req.encode('utf-8')
+
+        # send connection message to SuperUser
+        self.sock.sendto(encoded_req, tuple(leader))
+        data, rec_addr = self.sock.recvfrom(BYTES)
+        data = json.loads(data.decode('utf-8'))
+        self.neighbors["prev"] = leader
+        self.neighbors["next_1"] = data["next_1"]
+        self.neighbors["next_2"] = data["next_2"]
+        print(f'SuperUser: {data}')
+
+        print(self.neighbors)
+
+
+    def disconnect(self):
+        '''Allow user to exit chat ring'''
+        pass
+
+
+    def send_message(self, message):
+        '''Send a global message to all nodes in ring'''
+
+        message = {
+            "username": self.username,
+            "purpose": "global_message",
+            "message": message,
+            "count": self.message_count
+        }
+
+        self.message_count += 1;
+        
+        req = json.dumps(message).encode('utf-8');
+        # send global message to next neighbor
+        self.sock.sendto(req, self.neighbors["next_1"]);
+        data = self.sock.recv(BYTES);
+
+
+
+    def direct_message(self, username, message):
+        '''Send a direct message to a target user'''
+
+        message = {
+            "username": self.username,
+            "purpose": "direct",
+            "message": message,
+            "count": self.message_count,
+            "ip": self.ip,
+            "port": self.port,
+            "target": username
+        }
+
+        self.message_count += 1;
+        
+        req = json.dumps(message).encode('utf-8');
+        # send direct message to next neighbor
+        self.sock.sendto(req, self.neighbors["next_1"]);
+        data = self.sock.recv(BYTES);
+
+
+    def update_pointers(self, purpose, message, leader):
+        '''Update pointers to accomodate new nodes'''
+
+        if (purpose == "update_pointers"):
+            self.neighbors["prev"] = message["prev"]
+            if self.neighbors["next_2"] == None:
+                # next next pointer is the new node
+                self.neighbors["next_2"] = message["prev"]
+                # next pointer is the leader
+                self.neighbors["next_1"] = leader
+    
+            res = {
+                "status": "success",
+                "curr_next": self.neighbors["next_1"]
+            }
+
+            res = json.dumps(res).encode('utf-8')
+            self.sock.sendto(res, leader)
+
+        # update last node in ring to include new node
+        else:
+            self.neighbors["next_2"] = message["next_2"]
+            res = {
+                "status": "success",
+            }
+            res = json.dumps(res).encode('utf-8')
+            self.sock.sendto(res, leader)
+    
+
+    def handle_direct(self, message):
+        '''Handling the receival of a direct message'''
+
+        # check if username matches
+        if (self.username == message["username"]):
+            source = tuple(message["ip"], message["port"])
+            res = {
+                "username": self.username,
+                "status": "listening"
+            }
+
+            json_res = json.dumps(res).encode('utf-8')
+            self.sock.sendto(json_res, source)
+
+        # otherwise forward message to next
+        else:
+            # first send acknowledgement to sender
+            res = {
+                "username": self.username,
+                "purpose": "acknowledgement"
+            }
+            ack = json.dumps(res).encode('utf-8')
+            sender = tuple(message["ip"], message["port"])
+            self.sock.sendto(ack, sender)
+
+            # forward along message
+            message = json.dumps(message).encode('utf-8')
+            self.sock.sendto(message, self.neighbors["next_1"])
+
+            # block until receiving acknowledgement
+            while True:
+                data = self.sock.recv(bytes)
+                ack = json.loads(data.decode('utf-8'))
+                if (ack["purpose"] and ack["purpose"] == "acknowledgement"):
+                    break
+
+    
+    def listen(self):
+        '''Function to listen for incoming messages'''
+        
+        while True:
+
+            rlist, wlist, _ = select.select([sys.stdin, self.sock], [self.sock], [])
+
+            # user entered input
+            for read_s in rlist:
+                # read input
+                if read_s == sys.stdin:
+                    user_input = sys.stdin.readline()
+                    print(user_input)
+
+                # read incoming messages
+                else:
+                    data, addr = self.sock.recvfrom(BYTES)
+                    print(data)
+                    message = json.loads(data.decode('utf-8'))
+                    if (message["purpose"]):
+                        purpose = message["purpose"]
+                        # update pointers for a new node
+                        if (purpose == "update_pointers" or purpose == "update_last_node"):
+                            self.update_pointers(purpose, message, addr)
+                    
+                        # direct message
+                        elif (purpose == "direct"):
+                            self.handle_direct(message)
+
+                    print(self.neighbors)
+
