@@ -9,6 +9,8 @@
 
 import socket
 import json
+import select
+import sys
 
 
 LOGIN_SERVER = ('student00.cse.nd.edu', 3000)
@@ -34,8 +36,6 @@ class User:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((HOST,PORT))
         _, self.port = sock.getsockname()
-        # failure domain of 30 seconds
-        sock.settimeout(30)
         self.sock = sock
 
 
@@ -116,6 +116,8 @@ class User:
         message = {
             "username": self.username,
             "purpose": "global_message",
+            "ip": self.ip,
+            "port": self.port,
             "message": message,
             "count": self.message_count
         }
@@ -124,9 +126,7 @@ class User:
         
         req = json.dumps(message).encode('utf-8');
         # send global message to next neighbor
-        self.sock.sendto(req, self.neighbors["next_1"]);
-        data = self.sock.recv(BYTES);
-
+        self.sock.sendto(req, tuple(self.neighbors["next_1"]));
 
 
     def direct_message(self, username, message):
@@ -215,22 +215,42 @@ class User:
                 if (ack["purpose"] and ack["purpose"] == "acknowledgement"):
                     break
 
-    
-    def temp_listen(self):
+
+    def listen(self):
         '''Function to listen for incoming messages'''
         
         while True:
-            data, addr = self.sock.recvfrom(BYTES)
-            message = json.loads(data.decode('utf-8'))
-            if (message["purpose"]):
-                purpose = message["purpose"]
-                # update pointers for a new node
-                if (purpose == "update_pointers" or purpose == "update_last_node"):
-                    self.update_pointers(purpose, message, addr)
-            
-                # direct message
-                elif (purpose == "direct"):
-                    self.handle_direct(message)
 
-            print(self.neighbors)
+            rlist, wlist, _ = select.select([sys.stdin, self.sock], [self.sock], [])
 
+            #print(f'{self.username}: ', end='')
+            # user entered input
+            for read_s in rlist:
+                # read input
+                if read_s == sys.stdin:
+                    message = sys.stdin.readline()
+                    print(f'{self.username}: {message}')
+                    self.send_message(message)
+
+                # read incoming messages
+                else:
+                    print()
+                    data, addr = self.sock.recvfrom(BYTES)
+                    print(data)
+                    message = json.loads(data.decode('utf-8'))
+                    if (message["purpose"]):
+                        purpose = message["purpose"]
+                        # update pointers for a new node
+                        if (purpose == "update_pointers" or purpose == "update_last_node"):
+                            self.update_pointers(purpose, message, addr)
+                    
+                        # direct message
+                        elif (purpose == "direct"):
+                            self.handle_direct(message)
+
+                    print(self.neighbors)
+
+            for write_s in rlist:
+                pass
+                #TODO: send messages
+                #TODO: forward messages

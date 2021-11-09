@@ -16,7 +16,7 @@ def main():
     new_usr = User.User()
     new_usr.print_user()
     new_usr.connect()
-    new_usr.temp_listen()
+    new_usr.listen()
 
 
 if __name__ == '__main__':
