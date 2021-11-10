@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 
-# User.py
+# LoginServer.py
 # Authors: Kristen Friday, Carlo Preciado
 # Date: November 2, 2021
 # 
-# This program runs the login server for the peer to peer chat room
+# This program runs the login server for the peer to peer chat room.
 # This server listens for new Users wishing to connect, and forwards 
-# inforation about the SuperUser
+# information about the SuperUser
 
 # Imports
 import socket
 import json 
 import sys
+
 # Global Variables:
 HOST = ''
 PORT = 9000
@@ -19,6 +20,7 @@ BUFSIZ = 4096
 
 SUPERUSER_PORT = 0 
 SUPERUSER_HOST = ''
+
 
 def socket_bind():
     '''
@@ -30,10 +32,10 @@ def socket_bind():
     '''
 
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    
     s.bind((HOST,PORT))
 
     return s
+
 
 def receive_request(server_socket):
     '''
@@ -49,6 +51,7 @@ def receive_request(server_socket):
     data, address = server_socket.recvfrom(BUFSIZ)
     
     return {'request': data.decode('utf-8'), 'ip': address[0], 'port': int(address[1])}
+
 
 def process_request(server_socket, data, leader_info, name_list):
     '''
@@ -75,8 +78,7 @@ def process_request(server_socket, data, leader_info, name_list):
             # send a request for a names list to the user
             # if username in new name_list, respond with failure
             message = {"status": "failure", "error": "un-unique" }
-            message = json.dumps(message)
-            message = message.encode('utf-8')
+            message = json.dumps(message).encode('utf-8')
             return ((message, data['ip'], data['port']), name_list)
 
         else:
@@ -86,8 +88,7 @@ def process_request(server_socket, data, leader_info, name_list):
     leader_ip, leader_port = leader_info 
     
     message = {"status": "success", "leader": (leader_ip, leader_port)}
-    message = json.dumps(message)
-    message = message.encode('utf-8')
+    message = json.dumps(message).encode('utf-8')
 
     return ((message, data['ip'], data['port']), name_list)
      
@@ -100,7 +101,11 @@ def send_response(server_socket, response_package):
     message, ip, port = response_package
     server_socket.sendto(message, (ip, port))
 
+
 def run_server(leader_info):
+    '''
+        Listen for incoming Users
+    '''
     
     # create a new listening socket 
     server_socket = socket_bind()
@@ -111,6 +116,7 @@ def run_server(leader_info):
     # main while loop to listen for client requests
     _, port = server_socket.getsockname()
     print(f'LoginServer listening on port {port}...')
+
     while True:
         data  = receive_request(server_socket) 
         response_package, name_list = process_request(server_socket, data, leader_info, name_list)
@@ -118,7 +124,9 @@ def run_server(leader_info):
         print(name_list)
         send_response(server_socket, response_package)
 
+
 def usage():
+
     print('Usage: [SUPERHOST] [SUPERPORT]')
     sys.exit(0)
 
