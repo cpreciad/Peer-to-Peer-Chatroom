@@ -18,7 +18,7 @@ def main():
     new_usr.connect()
     
     while True:
-        message = input('> ')
+        message = input()
         new_usr.send_message(message)
 
 if __name__ == '__main__':

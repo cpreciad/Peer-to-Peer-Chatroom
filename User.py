@@ -12,9 +12,10 @@ import socket
 import json
 import hashlib
 import queue
+import time
 
 
-LOGIN_SERVER = ('student10.cse.nd.edu', 9000)
+LOGIN_SERVER = ('', 9000)
 BYTES = 1024
 HOST = ''
 PORT = 9907
@@ -36,7 +37,15 @@ class User:
        
         # "server" socket to listen for other peer's messages
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((HOST,PORT))
+		# find a port to bind to, which is in the range from 9000-9999
+        for port_num in range(9000, 10000):
+
+            try:
+                sock.bind((HOST,port_num))
+                break
+            except OSError:
+                continue
+
         _, self.port = sock.getsockname()
         self.sock = sock
 
@@ -305,7 +314,10 @@ class User:
         while True:
             if self.display_queue != []:
                 next_message = self.display_queue.get()
-                print(self.pending_table[next_message])
+                username = self.pending_table[next_message]['username']
+                message = self.pending_table[next_message]['message']
+                print(f'[{time.strftime("%H:%M",time.gmtime())}][{username}]: {message}', flush=True)
+                print('', flush=True)
                 # verify that the message id is in the 
                 # pending_table
 
