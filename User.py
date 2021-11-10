@@ -11,9 +11,10 @@ import socket
 import json
 import hashlib
 import queue
+import time
 
 
-LOGIN_SERVER = ('student11.cse.nd.edu', 9000)
+LOGIN_SERVER = ('', 9000)
 BYTES = 1024
 HOST = ''
 PORT = 9020
@@ -39,7 +40,16 @@ class User:
        
         # "server" socket to listen for other peer's messages
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((HOST,PORT))
+        
+        # find a port to bind to, which is in the range from 9000-9999
+        for port_num in range(9000, 10000):
+
+            try:
+                sock.bind((HOST,port_num))
+                break
+            except OSError:
+                continue
+
         _, self.port = sock.getsockname()
         self.sock = sock
 
@@ -94,7 +104,6 @@ class User:
         }
 
         req = json.dumps(json_req)
-        print(f'{self.username}: {req}')
         encoded_req = req.encode('utf-8')
 
         # send connection message to SuperUser
@@ -104,9 +113,6 @@ class User:
         self.neighbors["prev"] = leader
         self.neighbors["next_1"] = data["next_1"]
         self.neighbors["next_2"] = data["next_2"]
-        print(f'SuperUser: {data}')
-
-        print(self.neighbors)
 
         # set up threads for recieving messages, sending messages, and displaying messages
         listen_thread = threading.Thread(target = self.listen_internal, daemon = True)
@@ -226,24 +232,6 @@ class User:
                 data = self.sock.recv(bytes)
                 ack = json.loads(data.decode('utf-8'))
                 if (ack["purpose"] and ack["purpose"] == "acknowledgement"):
-                    break
-
-    
-    def temp_listen(self):
-        '''Function to listen for incoming messages'''
-        
-        while True:
-            data, addr = self.sock.recvfrom(BYTES)
-            message = json.loads(data.decode('utf-8'))
-            if (message["purpose"]):
-                purpose = message["purpose"]
-                # update pointers for a new node
-                if (purpose == "update_pointers" or purpose == "update_last_node"):
-                    self.update_pointers(purpose, message, addr)
-            
-                # direct message
-                elif (purpose == "direct"):
-                    self.handle_direct(message)
 
 
     def send_internal(self):
@@ -267,7 +255,10 @@ class User:
         while True:
             if self.display_queue != []:
                 next_message = self.display_queue.get()
-                print(self.pending_table[next_message])
+                username = self.pending_table[next_message]['username']
+                message = self.pending_table[next_message]['message']
+                print(f'[{time.strftime("%H:%M",time.gmtime())}][{username}]: {message}', flush=True)
+                print('')
                 # verify that the message id is in the 
                 # pending_table
 
