@@ -32,7 +32,12 @@ def socket_bind():
     '''
 
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.bind((HOST,PORT))
+    for port in range(9000,10000):
+        try:
+            s.bind((HOST,port))
+        except OSError:
+            continue
+            
 
     return s
 
