@@ -229,6 +229,24 @@ class Base_User:
             self.pending_table[self.hash_data(decoded_data)] = request
             self.message_queue.put(data)
 
+    def handle_disconnect(self, request):
+        '''
+            recieves a disconnect request, updates either the prev or 
+            next neighbor
+        '''
+
+        if request['next'] == 'same':
+            self.neighbors['prev'] = request['prev']
+        if request['prev'] == 'same':
+            self.neighbors['next_1'] = request['next']
+         
+        
+        if self.neighbors['next_1'] == self.neighbors['prev']:
+            self.neighbors['next_2'] == None
+
+        print(self.neighbors)
+
+
 
     def send_internal(self):
         ''' Internal method to send messages and wait for responses

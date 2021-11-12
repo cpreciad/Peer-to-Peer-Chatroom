@@ -19,6 +19,10 @@ def main():
     
     while True:
         message = input()
+        if message == 'disconnect':
+            new_usr.disconnect()
+            break
+
         new_usr.send_message(message)
 
 if __name__ == '__main__':
