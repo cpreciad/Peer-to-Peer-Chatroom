@@ -92,7 +92,27 @@ class User(Base_User.Base_User):
     
     def disconnect(self):
         '''Allow user to exit chat ring'''
-        pass
+        # make the first disconnection request to the next neighbor
+        json_req = {
+            "purpose": "disconnect",
+            "next"   : "same",
+            "prev"   : self.neighbors['prev']
+        }
+        req = json.dumps(json_req)
+        encoded_req = req.encode('utf-8')
+        self.sock.sendto(encoded_req, tuple(self.neighbors['next_1']))
+
+        # make the second disconnection request to the prev neighbors
+        json_req = {
+            "purpose": "disconnect",
+            "next"   : self.neighbors['next_1'],
+            "prev"   : "same"
+        }
+
+        req = json.dumps(json_req)
+        encoded_req = req.encode('utf-8')
+        self.sock.sendto(encoded_req, tuple(self.neighbors['prev']))
+
 
 
   
@@ -137,7 +157,9 @@ class User(Base_User.Base_User):
             
             elif (purpose == "acknowledgement"):
                 self.handle_ack(request, ack_sock)
-
+            
+            elif (purpose == "disconnect"):
+                self.handle_disconnect(request)
             else:
                 print(f"Unknown purpose: {purpose}")
 

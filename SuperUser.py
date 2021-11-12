@@ -53,7 +53,7 @@ class SuperUser(Base_User.Base_User):
                 update = json.dumps(update).encode('utf-8')
 
                 # request current next's next neighbor
-                self.sock.sendto(update, self.neighbors["next_1"])
+                self.sock.sendto(update, tuple(self.neighbors["next_1"]))
                 up_res, _ = self.sock.recvfrom(BYTES)
                 json_up_res = json.loads(up_res.decode('utf-8'))
 
@@ -75,7 +75,7 @@ class SuperUser(Base_User.Base_User):
                     return
 
                 update = json.dumps(update).encode('utf-8')
-                self.sock.sendto(update, self.neighbors["prev"])
+                self.sock.sendto(update, tuple(self.neighbors["prev"]))
                 up_res, _ = self.sock.recvfrom(BYTES)
                 json_up_res = json.loads(up_res.decode('utf-8'))
                 if (json_up_res["status"] == "success"):
@@ -144,6 +144,8 @@ class SuperUser(Base_User.Base_User):
             elif (purpose == "connect"):
                 self.add_users(request)
 
+            elif (purpose == "disconnect"):
+                self.handle_disconnect(request)
             else:
                 print(f"Unknown purpose: {purpose}")
             
