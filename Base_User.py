@@ -254,7 +254,10 @@ class Base_User:
                 next_message = self.display_queue.get()
                 username = self.pending_table[next_message]['username']
                 message = self.pending_table[next_message]['message']
-                print(f'[{time.strftime("%H:%M",time.gmtime())}][{username}]: {message}', flush=True)
+                begin = f'[{time.strftime("%H:%M",time.gmtime())}][{username}]'
+                if (self.pending_table[next_message]["purpose"] == "direct"):
+                    begin += f' (direct)'
+                print(f'{begin}: {message}', flush=True)
                 print('', flush=True)
                 # verify that the message id is in the 
                 # pending_table
