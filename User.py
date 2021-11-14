@@ -77,7 +77,6 @@ class User(Base_User.Base_User):
         self.neighbors["next_1"] = data["next_1"]
         self.neighbors["next_2"] = data["next_2"]
         
-        print(f'SuperUser: {data}')
 
         # set up threads for recieving messages, sending messages, and displaying messages
         listen_thread = threading.Thread(target = self.listen_internal, daemon = True)
@@ -95,7 +94,8 @@ class User(Base_User.Base_User):
         # make the first disconnection request to the next neighbor
         json_req = {
             "purpose": "disconnect",
-            "next"   : "same",
+            "next_1"   : "same",
+            "next_2"   : "same",
             "prev"   : self.neighbors['prev']
         }
         req = json.dumps(json_req)
@@ -105,7 +105,8 @@ class User(Base_User.Base_User):
         # make the second disconnection request to the prev neighbors
         json_req = {
             "purpose": "disconnect",
-            "next"   : self.neighbors['next_1'],
+            "next_1"   : self.neighbors['next_1'],
+            "next_2"   : "same",
             "prev"   : "same"
         }
 
@@ -159,7 +160,7 @@ class User(Base_User.Base_User):
                 self.handle_ack(request, ack_sock)
             
             elif (purpose == "disconnect"):
-                self.handle_disconnect(request)
+                self.handle_disconnect(request, ack_sock)
             else:
                 print(f"Unknown purpose: {purpose}")
 

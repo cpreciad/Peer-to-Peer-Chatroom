@@ -29,7 +29,6 @@ class SuperUser(Base_User.Base_User):
 
     def add_users(self, req):
         '''Method to listen for incoming clients and add to chat system'''
-
         location = (req["ip"], req["port"])
         new_next = (self.ip, self.port)
         new_next_next = None
@@ -97,6 +96,7 @@ class SuperUser(Base_User.Base_User):
 
         res = json.dumps(json_res).encode('utf-8')
         print(f'Added User {req["username"]}')
+        print(self.neighbors)
         self.sock.sendto(res, location)
 
     
@@ -145,7 +145,7 @@ class SuperUser(Base_User.Base_User):
                 self.add_users(request)
 
             elif (purpose == "disconnect"):
-                self.handle_disconnect(request)
+                self.handle_disconnect(request, ack_sock)
             else:
                 print(f"Unknown purpose: {purpose}")
             
