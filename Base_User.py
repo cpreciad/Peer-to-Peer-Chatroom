@@ -26,7 +26,7 @@ class Base_User:
     def __init__(self):
         '''Constructor for User objects'''
 
-        self.neighbors = {} # prev, next_1, next_2
+        self.neighbors = {}
         self.pending_table = {} # pending
         self.message_queue = queue.Queue()
         self.display_queue = queue.Queue() # history
@@ -229,22 +229,36 @@ class Base_User:
             self.pending_table[self.hash_data(decoded_data)] = request
             self.message_queue.put(data)
 
-    def handle_disconnect(self, request):
+    def handle_disconnect(self, request, ack_sock):
         '''
             recieves a disconnect request, updates either the prev or 
             next neighbor
         '''
-
-        if request['next'] == 'same':
-            self.neighbors['prev'] = request['prev']
-        if request['prev'] == 'same':
-            self.neighbors['next_1'] = request['next']
-         
         
-        if self.neighbors['next_1'] == self.neighbors['prev']:
-            self.neighbors['next_2'] == None
+        if request['prev'] != 'same':
+            self.neighbors['prev'] = request['prev']
 
-        print(self.neighbors)
+        if request['next_1'] != 'same':
+            self.neighbors['next_1'] = request['next_1']
+            json_req = {
+                "purpose": "disconnect",
+                "next_1" : "same",
+                "next_2" : self.neighbors['next_1'],
+                "prev"   : "same" 
+            }
+            req = json.dumps(json_req)
+            encoded_req = req.encode('utf-8')
+            ack_sock.sendto(encoded_req, tuple(self.neighbors['prev'])) 
+ 
+        if request['next_2'] != 'same':
+            self.neighbors['next_2']  = request['next_2']
+ 
+        if self.neighbors['next_1'] == self.neighbors['prev']:
+            self.neighbors['next_2'] = None
+        
+        # server case, when it is the only one left in the system
+        if self.neighbors['next_1'] == (self.ip, self.port):
+            self.neighbors = {}
 
 
 

@@ -19,7 +19,7 @@ def main():
     
     while True:
         message = input()
-        if message == 'disconnect':
+        if message == ':wq':
             new_usr.disconnect()
             break
 
