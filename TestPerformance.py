@@ -45,10 +45,9 @@ def test_global():
     count = 0
 
     while elapsed <= 3000000000:
-        usr.send_message("test message")
-        self.receive_message()
+        usr.send_message(f"test message {count}")
+        usr.receive_message()
         count += 1
-
         elapsed = time.time_ns() - start
 
     print("Performance of Global Messaging:")
