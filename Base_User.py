@@ -10,10 +10,10 @@
 import socket
 import json
 import hashlib
-import queue
 import time
 import select
 import sys
+import collections
 
 
 LOGIN_SERVER = ('', 9001)
@@ -29,7 +29,7 @@ class Base_User:
 
         self.username = None
         self.neighbors = {}
-        self.pending_table = {} # pending
+        self.pending_table = collections.OrderedDict() # pending
 
         self.ip = socket.gethostbyname(socket.gethostname())
        
@@ -66,8 +66,7 @@ class Base_User:
             encodes the message and add it to the message queue
         '''
 
-        print(message)
-        if message == "direct":
+        if message.strip() == "direct":
             user = input('@')
             content = input(f'(@{user})> ') 
             self.direct_message(user, content)
@@ -84,8 +83,8 @@ class Base_User:
         req = json.dumps(json_req)
         encoded_req = req.encode('utf-8')
 
-        # add transaction to pending
-        self.pending_table[self.hash_data(req)] = json_req
+        # add transaction to pending; mark as dirty (not yet displayed)
+        self.pending_table[self.hash_data(req)] = ['dirty', json_req]
 
         # forward message to neighbor
         self.sock.sendto(encoded_req, tuple(self.neighbors['next_1']))
@@ -107,7 +106,7 @@ class Base_User:
         encoded = req.encode('utf-8');
 
         # add transaction to pending
-        self.pending_table[self.hash_data(req)] = message
+        self.pending_table[self.hash_data(req)] = ['dirty', message]
 
         # forward message to neighbor
         self.sock.sendto(encoded, tuple(self.neighbors['next_1']))
@@ -140,22 +139,7 @@ class Base_User:
         
         res = json.dumps(res).encode('utf-8')
         self.sock.sendto(res, leader)
-    
-
-    def handle_ack(self, message):
-        '''Handle sending an acknowledgment back to send'''
-
-        res = {
-            "username": self.username,
-            "ip"      : self.ip,
-            "port"    : self.port,
-            "purpose" : "acknowledgement"
-        }
-
-        ack = json.dumps(res).encode('utf-8')
-        sender = (message["ip"], message["port"])
-        self.sock.sendto(ack, sender)
-
+  
 
     def handle_direct(self, message):
         '''Handling the receival of a direct message'''
@@ -181,16 +165,14 @@ class Base_User:
 
             res = json.dumps(json_res)
             encoded = res.encode('utf-8')
+            
             # display message
-            self.pending_table[self.hash_data(decoded_data)] = message
+            self.pending_table[self.hash_data(decoded_data)][0] = "clean"
             self.display(self.hash_data(decoded_data))
             self.sock.sendto(encoded, source)
 
         # otherwise forward message to next
         else:
-            # first send acknowledgement to sender
-            # self.handle_ack(message)
-
             # forward along message
             message = json.dumps(message).encode('utf-8')
             self.sock.sendto(message, tuple(self.neighbors["next_1"]))
@@ -215,11 +197,17 @@ class Base_User:
             }
             req = json.dumps(json_req)
             encoded_req = req.encode('utf-8')
-            # message to prev neighbor
-            self.sock.sendto(encoded_req, tuple(self.neighbors['prev']))
+
+            # update entry in pending table to having been received
+            self.pending_table[self.hash_data(decoded_data)][0] = 'clean'
+
+            # check if message is at top of queue to ensure consistent ordering
+            if self.hash_data(decoded_data) == list(self.pending_table.keys())[0]:
+                # message to prev neighbor
+                self.sock.sendto(encoded_req, tuple(self.neighbors['prev']))
 
         else:
-            self.pending_table[self.hash_data(decoded_data)] = request
+            self.pending_table[self.hash_data(decoded_data)] = ['dirty', request]
 
             # forward message to neighbor
             self.sock.sendto(data, tuple(self.neighbors['next_1']))
@@ -248,24 +236,25 @@ class Base_User:
  
         if request['next_2'] != 'same':
             self.neighbors['next_2']  = request['next_2']
- 
+
         if self.neighbors['next_1'] == self.neighbors['prev']:
             self.neighbors['next_2'] = None
         
         # server case, when it is the only one left in the system
-        if self.neighbors['next_1'] == (self.ip, self.port):
+        if tuple(self.neighbors['next_1']) == (self.ip, self.port):
             self.neighbors = {}
 
     
     def display(self, message_id):
         '''Internal method to display the message with a given id'''
         
-        username = self.pending_table[message_id]['username']
-        message = self.pending_table[message_id]['message']
+        req = self.pending_table[message_id][1]
+        username = req['username']
+        message = req['message']
 
         begin = f'[{time.strftime("%H:%M",time.gmtime())}][{username}]'
-        if (self.pending_table[message_id]["purpose"] == "direct"):
-            begin += f' (direct)'
+        if (req["purpose"] == "direct"):
+            begin += f'(direct)'
         
         print(f'{begin}: {message}')
 

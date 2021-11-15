@@ -125,9 +125,16 @@ class User(Base_User.Base_User):
             self.handle_global(request)
 
         elif purpose == 'global_response':
-            # put the message hash into the queue
+            # display the message
             self.display(request["message_id"])
+
             if request['username'] == self.username:
+                # check for additional acknowledged messages in pending
+                if self.pending_table:
+                    first_val = self.pending_table.values()[0]
+                    if first_val[0] == "clean":
+                        self.handle_global(self.pending_table.values()[0])
+
                 # stop forwarding the acknowledgement along
                 return
             else:
@@ -146,9 +153,6 @@ class User(Base_User.Base_User):
         elif (purpose == "direct"):
             self.handle_direct(request)
         
-        elif (purpose == "acknowledgement"):
-            self.handle_ack(request)
-        
         elif (purpose == "disconnect"):
             self.handle_disconnect(request)
         else:
@@ -166,7 +170,11 @@ class User(Base_User.Base_User):
             for read_s in rlist:
                 # read input
                 if read_s == sys.stdin:
-                    self.send_message(sys.stdin.readline())
+                    usr_input = sys.stdin.readline()
+                    if usr_input.strip() == "disconnect":
+                        self.disconnect()
+                        sys.exit(0)
+                    self.send_message(usr_input)
 
                 # read incoming messages
                 else:

@@ -46,7 +46,6 @@ def test_global():
 
     while elapsed <= 3000000000:
         usr.send_message("test message")
-        self.receive_message()
         count += 1
 
         elapsed = time.time_ns() - start
