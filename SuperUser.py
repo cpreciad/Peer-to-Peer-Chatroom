@@ -12,9 +12,10 @@ import Base_User
 import socket
 import json
 import time
-import threading
 import hashlib
 import queue
+import select
+import sys
 
 HOST = ''
 PORT = 9060
@@ -100,11 +101,8 @@ class SuperUser(Base_User.Base_User):
         self.sock.sendto(res, location)
 
     
-    def listen_internal(self):
-        # socket for forwarding acknowledgements
-        ack_sock =  socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    def receive_message(self):
         
-        print(f'SuperUser: Listening on port {self.port}...')
         # main listening loop
         while True:
             data, addr = self.sock.recvfrom(BYTES)
@@ -114,21 +112,21 @@ class SuperUser(Base_User.Base_User):
             
             # process the request accordingly
             if purpose == 'global':
-                self.handle_global(request, ack_sock)
+                self.handle_global(request)
                 
             elif purpose == 'global_response':
                 # put the message hash into the queue
-                self.display_queue.put(request['message_id'])
+                self.display(request['message_id'])
                 if request['username'] == self.username:
                     # stop forwarding the acknowledgement along
                     continue
                 else:
                     #TODO move along the acknowledgement
-                    ack_sock.sendto(data, tuple(self.neighbors['prev']))
+                    self.sock.sendto(data, tuple(self.neighbors['prev']))
             
             elif purpose == 'dm_response':
                 # put private message into display queue
-                self.display_queue.put(request['message_id'])
+                self.display(request['message_id'])
 
             # update pointers for a new node
             elif (purpose == "update_pointers" or purpose == "update_last_node"):
@@ -136,37 +134,42 @@ class SuperUser(Base_User.Base_User):
             
             # direct message
             elif (purpose == "direct"):
-                self.handle_direct(request, ack_sock)
+                self.handle_direct(request)
 
             elif (purpose == "acknowledgement"):
-                self.handle_ack(request, ack_sock)
+                self.handle_ack(request)
 
             elif (purpose == "connect"):
                 self.add_users(request)
 
             elif (purpose == "disconnect"):
-                self.handle_disconnect(request, ack_sock)
+                self.handle_disconnect(request)
             else:
                 print(f"Unknown purpose: {purpose}")
             
+    
+    def listen(self):
+        '''Function to listen for incoming messages'''
+
+        print(f'SuperUser: Listening on port {self.port}...')
+        while True:
+
+            rlist, _, _ = select.select([sys.stdin, self.sock], [], [])
+
+            # user entered input
+            for read_s in rlist:
+                # read input
+                if read_s == sys.stdin:
+                    self.send_message(sys.stdin.readline())
+
+                # read incoming messages
+                else:
+                    self.receive_message()
 
 
 if __name__ == '__main__':
 
     super_usr = SuperUser()
     super_usr.print_user()
-
-    listen_thread = threading.Thread(target = super_usr.listen_internal, daemon = True)
-    listen_thread.start()
-        
-    send_thread = threading.Thread(target = super_usr.send_internal, daemon = True)
-    send_thread.start()
-
-    display_thread = threading.Thread(target = super_usr.display_internal, daemon = True)
-    display_thread.start()
-
-
-    while True:
-        message = input()
-        super_usr.send_message(message)
+    super_usr.listen()
  
