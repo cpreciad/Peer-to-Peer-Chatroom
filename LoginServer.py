@@ -54,7 +54,7 @@ def receive_request(server_socket):
     '''
     
     data, address = server_socket.recvfrom(BUFSIZ)
-    
+
     return {'request': data.decode('utf-8'), 'ip': address[0], 'port': int(address[1])}
 
 

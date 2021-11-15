@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 
-# User.py
+# Base_User.py
 # Authors: Kristen Friday, Carlo Preciado
 # Date: November 10, 2021
 #
 # The Base User class defines a basic implementation of a node in the chat system
 # It serves as the abstraction template for basic functionality
 
-import threading
 import socket
 import json
 import hashlib
-import queue
 import time
+import select
+import sys
+import collections
 
 
 LOGIN_SERVER = ('', 9001)
@@ -26,19 +27,16 @@ class Base_User:
     def __init__(self):
         '''Constructor for User objects'''
 
+        self.username = None
         self.neighbors = {}
-        self.pending_table = {} # pending
-        self.message_queue = queue.Queue()
-        self.display_queue = queue.Queue() # history
+        self.pending_table = collections.OrderedDict() # pending
 
-        ip = socket.gethostbyname(socket.gethostname())
-        self.ip = ip
+        self.ip = socket.gethostbyname(socket.gethostname())
        
         # "server" socket to listen for other peer's messages
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		# find a port to bind to, which is in the range from 9000-9999
         for port_num in range(9000, 10000):
-
             try:
                 sock.bind((HOST,port_num))
                 break
@@ -47,9 +45,6 @@ class Base_User:
 
         _, self.port = sock.getsockname()
         self.sock = sock
-
-        #  socket to send or forward messages
-        self.messaging_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 
     def hash_data(self, data):
@@ -63,11 +58,6 @@ class Base_User:
         print(f'IP Addr:   {self.ip}')
         print(f'Port:      {self.port}\n')
 
-    
-    def disconnect(self):
-        '''Allow user to exit chat ring'''
-        pass
-
 
     def send_message(self, message):
         ''' Send a global message to all nodes in ring
@@ -76,7 +66,7 @@ class Base_User:
             encodes the message and add it to the message queue
         '''
 
-        if message == "direct":
+        if message.strip() == "direct":
             user = input('@')
             content = input(f'(@{user})> ') 
             self.direct_message(user, content)
@@ -91,12 +81,13 @@ class Base_User:
         }
 
         req = json.dumps(json_req)
-        
         encoded_req = req.encode('utf-8')
-        # add transaction to pending
-        self.pending_table[self.hash_data(req)] = json_req
-        # put message in the queue for consistent ordering
-        self.message_queue.put(encoded_req)
+
+        # add transaction to pending; mark as dirty (not yet displayed)
+        self.pending_table[self.hash_data(req)] = ['dirty', json_req]
+
+        # forward message to neighbor
+        self.sock.sendto(encoded_req, tuple(self.neighbors['next_1']))
 
 
     def direct_message(self, username, message):
@@ -113,10 +104,12 @@ class Base_User:
         
         req = json.dumps(message)
         encoded = req.encode('utf-8');
+
         # add transaction to pending
-        self.pending_table[self.hash_data(req)] = message
-        # put message in the queue for consistent ordering
-        self.message_queue.put(encoded)
+        self.pending_table[self.hash_data(req)] = ['dirty', message]
+
+        # forward message to neighbor
+        self.sock.sendto(encoded, tuple(self.neighbors['next_1']))
 
 
     def update_pointers(self, purpose, message, leader):
@@ -146,24 +139,9 @@ class Base_User:
         
         res = json.dumps(res).encode('utf-8')
         self.sock.sendto(res, leader)
-    
+  
 
-    def handle_ack(self, message, ack_sock):
-        '''Handle sending an acknowledgment back to send'''
-
-        res = {
-            "username": self.username,
-            "ip"      : self.ip,
-            "port"    : self.port,
-            "purpose" : "acknowledgement"
-        }
-
-        ack = json.dumps(res).encode('utf-8')
-        sender = (message["ip"], message["port"])
-        ack_sock.sendto(ack, sender)
-
-
-    def handle_direct(self, message, ack_sock):
+    def handle_direct(self, message):
         '''Handling the receival of a direct message'''
 
         decoded_data = json.dumps(message)
@@ -187,24 +165,20 @@ class Base_User:
 
             res = json.dumps(json_res)
             encoded = res.encode('utf-8')
+            
             # display message
-            self.pending_table[self.hash_data(decoded_data)] = message
-            self.display_queue.put(self.hash_data(decoded_data))
-            ack_sock.sendto(encoded, source)
+            self.pending_table[self.hash_data(decoded_data)][0] = "clean"
+            self.display(self.hash_data(decoded_data))
+            self.sock.sendto(encoded, source)
 
         # otherwise forward message to next
         else:
-            # first send acknowledgement to sender
-            self.handle_ack(message, ack_sock)
-
             # forward along message
             message = json.dumps(message).encode('utf-8')
-            ack_sock.sendto(message, tuple(self.neighbors["next_1"]))
-
-            # TODO: determine if forwarded message is received
+            self.sock.sendto(message, tuple(self.neighbors["next_1"]))
 
 
-    def handle_global(self, request, ack_sock):
+    def handle_global(self, request):
         '''
             simply add the request to the message queue and 
             let the main program handle this, unless its from itself,
@@ -213,8 +187,9 @@ class Base_User:
 
         decoded_data = json.dumps(request)
         data = decoded_data.encode('utf-8')
+
         if request['username'] == self.username:
-            # forward the acknowledgement message
+            # reach end of ring; send back response
             json_req = {
                 "username"    : self.username,
                 "purpose"     : "global_response",
@@ -222,14 +197,23 @@ class Base_User:
             }
             req = json.dumps(json_req)
             encoded_req = req.encode('utf-8')
-            #TODO message to prev neighbor
-            ack_sock.sendto(encoded_req, tuple(self.neighbors['prev']))
+
+            # update entry in pending table to having been received
+            self.pending_table[self.hash_data(decoded_data)][0] = 'clean'
+
+            # check if message is at top of queue to ensure consistent ordering
+            if self.hash_data(decoded_data) == list(self.pending_table.keys())[0]:
+                # message to prev neighbor
+                self.sock.sendto(encoded_req, tuple(self.neighbors['prev']))
 
         else:
-            self.pending_table[self.hash_data(decoded_data)] = request
-            self.message_queue.put(data)
+            self.pending_table[self.hash_data(decoded_data)] = ['dirty', request]
 
-    def handle_disconnect(self, request, ack_sock):
+            # forward message to neighbor
+            self.sock.sendto(data, tuple(self.neighbors['next_1']))
+
+
+    def handle_disconnect(self, request):
         '''
             recieves a disconnect request, updates either the prev or 
             next neighbor
@@ -248,49 +232,34 @@ class Base_User:
             }
             req = json.dumps(json_req)
             encoded_req = req.encode('utf-8')
-            ack_sock.sendto(encoded_req, tuple(self.neighbors['prev'])) 
+            self.sock.sendto(encoded_req, tuple(self.neighbors['prev'])) 
  
         if request['next_2'] != 'same':
             self.neighbors['next_2']  = request['next_2']
- 
+
         if self.neighbors['next_1'] == self.neighbors['prev']:
             self.neighbors['next_2'] = None
         
         # server case, when it is the only one left in the system
-        if self.neighbors['next_1'] == (self.ip, self.port):
+        if tuple(self.neighbors['next_1']) == (self.ip, self.port):
             self.neighbors = {}
 
+    
+    def display(self, message_id):
+        '''Internal method to display the message with a given id'''
+        
+        req = self.pending_table[message_id][1]
+        username = req['username']
+        message = req['message']
+
+        begin = f'[{time.strftime("%H:%M",time.gmtime())}][{username}]'
+        if (req["purpose"] == "direct"):
+            begin += f'(direct)'
+        
+        print(f'{begin}: {message}')
+
+        # remove from pending table
+        self.pending_table.pop(message_id)
 
 
-    def send_internal(self):
-        ''' Internal method to send messages and wait for responses
-            
-            May have the additional responsibility of detecting if a neighbor has crashed
-        '''
-        #  socket to send or forward messages
-        messaging_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-        while True:
-            if self.message_queue != []:
-                next_message = self.message_queue.get() 
-
-                # TODO send the next message to this users next neighbor
-                messaging_sock.sendto(next_message, tuple(self.neighbors['next_1']))
-
-
-    def display_internal(self):
-        '''Internal method to remove the messsage from the queue and display the message'''
-
-        while True:
-            if self.display_queue != []:
-                next_message = self.display_queue.get()
-                username = self.pending_table[next_message]['username']
-                message = self.pending_table[next_message]['message']
-                begin = f'[{time.strftime("%H:%M",time.gmtime())}][{username}]'
-                if (self.pending_table[next_message]["purpose"] == "direct"):
-                    begin += f' (direct)'
-                print(f'{begin}: {message}', flush=True)
-                print('', flush=True)
-                # verify that the message id is in the 
-                # pending_table
 

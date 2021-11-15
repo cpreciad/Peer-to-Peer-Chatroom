@@ -9,12 +9,13 @@
 
 import Base_User
 
-import threading
 import socket
 import json
 import hashlib
 import queue
 import time
+import sys
+import select
 
 
 LOGIN_SERVER = ('', 9001)
@@ -25,9 +26,13 @@ PORT = 9907
 
 class User(Base_User.Base_User):
 
-    def __init__(self):
-        self.username = input("Enter your username: ")
+    def __init__(self, username=None):
         super().__init__()
+        if username is None:
+            self.username = input("Enter your username: ")
+        else:
+            self.username = username
+
 
     def connect_to_login(self):
         '''Method to set up UDP connection with LoginServer'''
@@ -76,21 +81,11 @@ class User(Base_User.Base_User):
         self.neighbors["prev"] = leader
         self.neighbors["next_1"] = data["next_1"]
         self.neighbors["next_2"] = data["next_2"]
-        
-
-        # set up threads for recieving messages, sending messages, and displaying messages
-        listen_thread = threading.Thread(target = self.listen_internal, daemon = True)
-        listen_thread.start()
-        
-        send_thread = threading.Thread(target = self.send_internal, daemon = True)
-        send_thread.start()
-
-        display_thread = threading.Thread(target = self.display_internal, daemon = True)
-        display_thread.start()
 
     
     def disconnect(self):
         '''Allow user to exit chat ring'''
+        
         # make the first disconnection request to the next neighbor
         json_req = {
             "purpose": "disconnect",
@@ -98,6 +93,7 @@ class User(Base_User.Base_User):
             "next_2"   : "same",
             "prev"   : self.neighbors['prev']
         }
+
         req = json.dumps(json_req)
         encoded_req = req.encode('utf-8')
         self.sock.sendto(encoded_req, tuple(self.neighbors['next_1']))
@@ -115,52 +111,72 @@ class User(Base_User.Base_User):
         self.sock.sendto(encoded_req, tuple(self.neighbors['prev']))
 
 
-
-  
-    def listen_internal(self):
+    def receive_message(self):
         '''Listen for incoming messages and process accordingly'''
 
-        # socket for forwarding acknowledgements
-        ack_sock =  socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        
         # main listening loop
-        while True:
-            data, addr = self.sock.recvfrom(BYTES)
-            decoded_data = data.decode('utf-8')
-            request = json.loads(decoded_data)
-            purpose = request['purpose']
+        data, addr = self.sock.recvfrom(BYTES)
+        decoded_data = data.decode('utf-8')
+        request = json.loads(decoded_data)
+        purpose = request['purpose']
 
-            # process the request accordingly
-            if purpose == 'global':
-                self.handle_global(request, ack_sock)
+        # process the request accordingly
+        if purpose == 'global':
+            self.handle_global(request)
 
-            elif purpose == 'global_response':
-                # put the message hash into the queue
-                self.display_queue.put(request['message_id'])
-                if request['username'] == self.username:
-                    # stop forwarding the acknowledgement along
-                    continue
-                else:
-                    # move along the acknowledgement
-                    ack_sock.sendto(data, tuple(self.neighbors['prev']))
-            
-            elif purpose == 'dm_response':
-                # put private message into display queue
-                self.display_queue.put(request['message_id'])
+        elif purpose == 'global_response':
+            # display the message
+            self.display(request["message_id"])
 
-            # update pointers for a new node
-            elif (purpose == "update_pointers" or purpose == "update_last_node"):
-                self.update_pointers(purpose, request, addr)
-            
-            # direct message
-            elif (purpose == "direct"):
-                self.handle_direct(request, ack_sock)
-            
-            elif (purpose == "acknowledgement"):
-                self.handle_ack(request, ack_sock)
-            
-            elif (purpose == "disconnect"):
-                self.handle_disconnect(request, ack_sock)
+            if request['username'] == self.username:
+                # check for additional acknowledged messages in pending
+                if self.pending_table:
+                    first_val = list(self.pending_table.values())[0]
+                    if first_val[0] == "clean":
+                        self.handle_global(first_val[1])
+
+                # stop forwarding the acknowledgement along
+                return
             else:
-                print(f"Unknown purpose: {purpose}")
+                # move along the acknowledgement
+                self.sock.sendto(data, tuple(self.neighbors['prev']))
+        
+        elif purpose == 'dm_response':
+            # put private message into display queue
+            self.display(request['message_id'])
+
+        # update pointers for a new node
+        elif (purpose == "update_pointers" or purpose == "update_last_node"):
+            self.update_pointers(purpose, request, addr)
+        
+        # direct message
+        elif (purpose == "direct"):
+            self.handle_direct(request)
+        
+        elif (purpose == "disconnect"):
+            self.handle_disconnect(request)
+        else:
+            print(f"Unknown purpose: {purpose}")
+
+
+    def listen(self):
+        '''Function to listen for incoming messages'''
+        
+        while True:
+
+            rlist, _, _ = select.select([sys.stdin, self.sock], [], [])
+
+            # user entered input
+            for read_s in rlist:
+                # read input
+                if read_s == sys.stdin:
+                    usr_input = sys.stdin.readline()
+                    if usr_input.strip() == "disconnect":
+                        self.disconnect()
+                        sys.exit(0)
+                    self.send_message(usr_input)
+
+                # read incoming messages
+                else:
+                    self.receive_message()
 
