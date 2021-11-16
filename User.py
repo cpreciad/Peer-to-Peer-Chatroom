@@ -102,7 +102,7 @@ class User(Base_User.Base_User):
         json_req = {
             "purpose": "disconnect",
             "next_1"   : self.neighbors['next_1'],
-            "next_2"   : "same",
+            "next_2"   : self.neighbors['next_2'],
             "prev"   : "same"
         }
 

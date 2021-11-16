@@ -222,8 +222,9 @@ class Base_User:
         if request['prev'] != 'same':
             self.neighbors['prev'] = request['prev']
 
-        if request['next_1'] != 'same':
+        elif request['next_1'] != 'same' and request['next_2'] != 'same':
             self.neighbors['next_1'] = request['next_1']
+            self.neighbors['next_2'] = request['next_2']
             json_req = {
                 "purpose": "disconnect",
                 "next_1" : "same",
@@ -234,18 +235,20 @@ class Base_User:
             encoded_req = req.encode('utf-8')
             self.sock.sendto(encoded_req, tuple(self.neighbors['prev'])) 
  
-        if request['next_2'] != 'same':
+        elif request['next_2'] != 'same':
             if self.neighbors == {}:
                 return
             self.neighbors['next_2']  = request['next_2']
-
+		
+		# case where system is super user and a single user
         if self.neighbors['next_1'] == self.neighbors['prev']:
             self.neighbors['next_2'] = None
         
-        # server case, when it is the only one left in the system
+        # when super user is the only one left in the system
         if tuple(self.neighbors['next_1']) == (self.ip, self.port):
             self.neighbors = {}
-
+	
+        print(self.neighbors)
     
     def display(self, message_id):
         '''Internal method to display the message with a given id'''
