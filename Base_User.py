@@ -235,6 +235,8 @@ class Base_User:
             self.sock.sendto(encoded_req, tuple(self.neighbors['prev'])) 
  
         if request['next_2'] != 'same':
+            if self.neighbors == {}:
+                return
             self.neighbors['next_2']  = request['next_2']
 
         if self.neighbors['next_1'] == self.neighbors['prev']:
