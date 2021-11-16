@@ -110,6 +110,14 @@ class User(Base_User.Base_User):
         encoded_req = req.encode('utf-8')
         self.sock.sendto(encoded_req, tuple(self.neighbors['prev']))
 
+        # final request to login server to notify name removal from system
+        json_req = {
+		    "purpose": "disconnect",
+            "username": self.username
+        }
+        req = json.dumps(json_req)
+        encoded_req = req.encode('utf-8')
+        self.sock.sendto(encoded_req, LOGIN_SERVER)
 
     def receive_message(self):
         '''Listen for incoming messages and process accordingly'''

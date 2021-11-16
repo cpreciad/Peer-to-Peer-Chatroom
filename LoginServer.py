@@ -78,6 +78,10 @@ def process_request(server_socket, data, leader_info, name_list):
     if request['username'] == 'super_user':
         pass
 
+    if request['purpose'] == 'disconnect':
+        name_list.remove(request['username'])
+        return (None, name_list)
+
     if request['purpose'] == 'connect':
         if request['username'] in name_list:
             # send a request for a names list to the user
@@ -127,6 +131,8 @@ def run_server(leader_info):
         response_package, name_list = process_request(server_socket, data, leader_info, name_list)
         print('Users in Chat Room: ', end='')
         print(name_list)
+        if response_package == None:
+            continue
         send_response(server_socket, response_package)
 
 
