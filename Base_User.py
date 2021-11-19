@@ -30,6 +30,8 @@ class Base_User:
         self.username = None
         self.neighbors = {}
         self.pending_table = collections.OrderedDict() # pending
+        self.history_table = set()
+        self.message_count = 0
 
         self.ip = socket.gethostbyname(socket.gethostname())
        
@@ -65,19 +67,22 @@ class Base_User:
             really just an abstraction for adding a message to a message queue
             encodes the message and add it to the message queue
         '''
+        
+        self.message_count += 1
 
         if message.strip() == "direct":
             user = input('@')
             content = input(f'(@{user})> ') 
             self.direct_message(user, content)
             return
-
+        
         json_req = {
-            "username": self.username,
-            "purpose" : "global",
-            "message" : message,
-            "ip"      : self.ip,
-            "port"    : self.port
+            "username"      : self.username,
+            "purpose"       : "global",
+            "message"       : message,
+            "ip"            : self.ip,
+            "port"          : self.port,
+            "message_count" : self.message_count
         }
 
         req = json.dumps(json_req)
@@ -94,12 +99,13 @@ class Base_User:
         '''Send a direct message to a target user'''
 
         message = {
-            "username"   : self.username,
-            "purpose"    : "direct",
-            "message"    : message,
-            "ip"         : self.ip,
-            "port"       : self.port,
-            "target"     : username,
+            "username"     : self.username,
+            "purpose"      : "direct",
+            "message"      : message,
+            "ip"           : self.ip,
+            "port"         : self.port,
+            "target"       : username,
+            "message_count": self.message_count
         }
         
         req = json.dumps(message)
@@ -188,15 +194,27 @@ class Base_User:
         decoded_data = json.dumps(request)
         data = decoded_data.encode('utf-8')
 
+        # global acknowledgement response, for when message has either
+        # circulated through entire ring, or message has reached a User 
+        # who has already seen the message
+
+        json_req = {
+            "username"    : self.username,
+            "purpose"     : "global_response",
+            "message_id"  : self.hash_data(decoded_data) 
+        }
+        req = json.dumps(json_req)
+        encoded_req = req.encode('utf-8')
+
+        # check if incoming data is already in the hisory table
+        if self.hash_data(decoded_data) in self.history_table:
+            # send back the acknowledgement messages
+            self.sock.sendto(encoded_req, tuple(self.neighbors['prev']))
+            return 
+
+
+        # reach end of ring; send back response
         if request['username'] == self.username:
-            # reach end of ring; send back response
-            json_req = {
-                "username"    : self.username,
-                "purpose"     : "global_response",
-                "message_id"  : self.hash_data(decoded_data) 
-            }
-            req = json.dumps(json_req)
-            encoded_req = req.encode('utf-8')
 
             # update entry in pending table to having been received
             self.pending_table[self.hash_data(decoded_data)][0] = 'clean'
@@ -248,7 +266,6 @@ class Base_User:
         if tuple(self.neighbors['next_1']) == (self.ip, self.port):
             self.neighbors = {}
 	
-        print(self.neighbors)
     
     def display(self, message_id):
         '''Internal method to display the message with a given id'''
@@ -265,6 +282,7 @@ class Base_User:
 
         # remove from pending table
         self.pending_table.pop(message_id)
-
+        # add the message_id to the history table
+        self.history_table.add(message_id)
 
 
