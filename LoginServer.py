@@ -12,6 +12,8 @@
 import socket
 import json 
 import sys
+import time
+import select
 
 # Global Variables:
 HOST = ''
@@ -79,7 +81,7 @@ def process_request(server_socket, data, leader_info, name_list):
         pass
 
     if request['purpose'] == 'disconnect':
-        name_list.remove(request['username'])
+        name_list.pop(request['username'])
         return (None, name_list)
 
     if request['purpose'] == 'connect':
@@ -92,7 +94,7 @@ def process_request(server_socket, data, leader_info, name_list):
 
         else:
             # add the username to the list continue on
-            name_list.append(request['username'])
+            name_list[request['username']] = (data['ip'], data['port'])
 
     leader_ip, leader_port = leader_info 
     
@@ -110,6 +112,23 @@ def send_response(server_socket, response_package):
     message, ip, port = response_package
     server_socket.sendto(message, (ip, port))
 
+def send_alert():
+    pass
+
+def check_on_users(server_socket, name_list):
+    # temporarily set a timeout to recieve
+    server_socket.settimeout(5)
+    for key in name_list:
+        server_socket.sendto(json.dumps({"purpose": "checkup"}).encode('utf-8'), name_list[key])
+        data = server_socket.recv(BUFSIZ)
+        # if a response hasnt been recieved before 5 seconds, send a disconnection alert and remove the username
+        print(data)
+        if data == b'':
+            send_alert(name_list[key])
+            name_list.pop(key)
+    
+    # set the time back
+    server_socket.settimeout(None)
 
 def run_server(leader_info):
     '''
@@ -120,21 +139,25 @@ def run_server(leader_info):
     server_socket = socket_bind()
 
     # create a list of names
-    name_list = []
+    name_list = {}
 
     # main while loop to listen for client requests
     _, port = server_socket.getsockname()
     print(f'LoginServer listening on port {port}...')
-
     while True:
-        data  = receive_request(server_socket) 
-        response_package, name_list = process_request(server_socket, data, leader_info, name_list)
-        print('Users in Chat Room: ', end='')
-        print(name_list)
-        if response_package == None:
-            continue
-        send_response(server_socket, response_package)
+        rlist, _, _ = select.select([server_socket], [], [], 15)
+        if rlist != []:
+            data  = receive_request(server_socket) 
+            response_package, name_list = process_request(server_socket, data, leader_info, name_list)
+            print('Users in Chat Room: ', end='')
+            print(name_list)
+            if response_package == None:
+                continue
+            send_response(server_socket, response_package)
+        else:
+            check_on_users(server_socket, name_list)
 
+        
 
 def usage():
 

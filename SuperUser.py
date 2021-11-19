@@ -148,6 +148,8 @@ class SuperUser(Base_User.Base_User):
 
         elif (purpose == "disconnect"):
             self.handle_disconnect(request)
+        elif (purpose == "checkup"):
+            self.sock.sendto(json.dumps({"status":"ok"}).encode('utf-8'), LOGIN_SERVER)
         else:
             print(f"Unknown purpose: {purpose}")
             
