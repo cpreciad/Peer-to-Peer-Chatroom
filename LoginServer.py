@@ -22,6 +22,7 @@ BUFSIZ = 4096
 
 SUPERUSER_PORT = 0 
 SUPERUSER_HOST = ''
+TIMEOUT = 1
 
 
 def socket_bind():
@@ -77,8 +78,10 @@ def process_request(server_socket, data, leader_info, name_list):
    
     # reassign the name_list
     request = json.loads(data['request'])
-    if request['username'] == 'super_user':
-        pass
+    
+    if request['purpose'] == 'checkup':
+        name_list = check_on_users(server_socket, name_list, leader_info)
+        return (None, name_list)
 
     if request['purpose'] == 'disconnect':
         name_list.pop(request['username'])
@@ -94,7 +97,7 @@ def process_request(server_socket, data, leader_info, name_list):
 
         else:
             # add the username to the list continue on
-            name_list[request['username']] = (data['ip'], data['port'])
+            name_list[request['username']] = (request['ip'], request['port'])
 
     leader_ip, leader_port = leader_info 
     
@@ -112,23 +115,39 @@ def send_response(server_socket, response_package):
     message, ip, port = response_package
     server_socket.sendto(message, (ip, port))
 
-def send_alert():
-    pass
+def send_alert(username, user_info, server_socket, leader_info):
+    '''Send a crash alert to the super user, figure out which node in the system crashed'''
 
-def check_on_users(server_socket, name_list):
+    json_req = {"purpose" : "crash",
+                "username": username,
+                "info"    : user_info}
+    req = json.dumps(json_req)
+    encoded_req = req.encode('utf-8')
+    server_socket.sendto(encoded_req, leader_info) 
+
+
+    print(f"{username} has crashed")
+
+def check_on_users(server_socket, name_list, leader_info):
     # temporarily set a timeout to recieve
-    server_socket.settimeout(5)
+    server_socket.settimeout(TIMEOUT)
+    names_to_remove = []
     for key in name_list:
         server_socket.sendto(json.dumps({"purpose": "checkup"}).encode('utf-8'), name_list[key])
-        data = server_socket.recv(BUFSIZ)
-        # if a response hasnt been recieved before 5 seconds, send a disconnection alert and remove the username
-        print(data)
-        if data == b'':
-            send_alert(name_list[key])
-            name_list.pop(key)
+        try:
+            data = server_socket.recv(BUFSIZ)
+        except socket.timeout:
+            # if a response hasnt been recieved before 5 seconds, send a disconnection alert and remove the username
+            send_alert(key, name_list[key], server_socket, leader_info)
+            names_to_remove.append(key)
     
     # set the time back
+    
+    for key in names_to_remove:
+        name_list.pop(key)
+
     server_socket.settimeout(None)
+    return name_list
 
 def run_server(leader_info):
     '''
@@ -145,7 +164,7 @@ def run_server(leader_info):
     _, port = server_socket.getsockname()
     print(f'LoginServer listening on port {port}...')
     while True:
-        rlist, _, _ = select.select([server_socket], [], [], 15)
+        rlist, _, _ = select.select([server_socket], [], [])
         if rlist != []:
             data  = receive_request(server_socket) 
             response_package, name_list = process_request(server_socket, data, leader_info, name_list)

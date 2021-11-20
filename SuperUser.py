@@ -17,9 +17,11 @@ import queue
 import select
 import sys
 
+LOGIN_SERVER = ('', 9001)
 HOST = ''
 PORT = 9060
 BYTES = 1024
+TIMEOUT = 3
 
 
 class SuperUser(Base_User.Base_User):
@@ -121,7 +123,7 @@ class SuperUser(Base_User.Base_User):
             if request['username'] == self.username:
                 # check for additional acknowledged messages in pending
                 if self.pending_table:
-                    first_val = self.pending_table.values()[0]
+                    first_val = list(self.pending_table.values())[0]
                     if first_val[0] == "clean":
                         self.handle_global(self.pending_table.values()[0])
 
@@ -150,6 +152,8 @@ class SuperUser(Base_User.Base_User):
             self.handle_disconnect(request)
         elif (purpose == "checkup"):
             self.sock.sendto(json.dumps({"status":"ok"}).encode('utf-8'), LOGIN_SERVER)
+        elif (purpose == "crash"):
+            self.handle_crash(request)
         else:
             print(f"Unknown purpose: {purpose}")
             
@@ -160,7 +164,7 @@ class SuperUser(Base_User.Base_User):
         print(f'SuperUser: Listening on port {self.port}...')
         while True:
 
-            rlist, _, _ = select.select([sys.stdin, self.sock], [], [])
+            rlist, _, _ = select.select([sys.stdin, self.sock], [], [], TIMEOUT)
 
             # user entered input
             for read_s in rlist:
@@ -171,7 +175,21 @@ class SuperUser(Base_User.Base_User):
                 # read incoming messages
                 else:
                     self.receive_message()
-
+			# check if there have been any timeouts for a message at the top of the pending queue
+            if len(self.pending_table):
+                req = list(self.pending_table.values())[0][1]
+                name = list(self.pending_table.values())[0][2]
+                user_time = list(self.pending_table.values())[0][3]
+                sent = list(self.pending_table.values())[0][4]
+    
+                if time.time() - user_time > TIMEOUT and name == self.username:
+                    if sent == False:
+                        # it's this users responsibility to prompt the checkins
+                        # tell the login server to check for timeouts
+                        self.sock.sendto(json.dumps({"purpose":"checkup"}).encode('utf-8'), LOGIN_SERVER)
+                        self.pending_table[list(self.pending_table.keys())[0]][4] = True
+                    else:
+                       self.sock.sendto(json.dumps(req).encode('utf-8'),tuple(self.neighbors['next_1']))  
 
 if __name__ == '__main__':
 
