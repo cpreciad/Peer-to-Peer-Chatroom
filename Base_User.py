@@ -89,7 +89,7 @@ class Base_User:
         encoded_req = req.encode('utf-8')
 
         # add transaction to pending; mark as dirty (not yet displayed)
-        self.pending_table[self.hash_data(req)] = ['dirty', json_req]
+        self.pending_table[self.hash_data(req)] = ['dirty', json_req, self.username, time.time(), False]
 
         # forward message to neighbor
         self.sock.sendto(encoded_req, tuple(self.neighbors['next_1']))
@@ -112,7 +112,7 @@ class Base_User:
         encoded = req.encode('utf-8');
 
         # add transaction to pending
-        self.pending_table[self.hash_data(req)] = ['dirty', message]
+        self.pending_table[self.hash_data(req)] = ['dirty', message, self.username, time.time(), False]
 
         # forward message to neighbor
         self.sock.sendto(encoded, tuple(self.neighbors['next_1']))
@@ -173,7 +173,7 @@ class Base_User:
             encoded = res.encode('utf-8')
             
             # display message
-            self.pending_table[self.hash_data(decoded_data)][0] = "clean"
+            self.pending_table[self.hash_data(decoded_data)] = ["clean", message, message['username'], time.time(), False]  
             self.display(self.hash_data(decoded_data))
             self.sock.sendto(encoded, source)
 
@@ -225,7 +225,7 @@ class Base_User:
                 self.sock.sendto(encoded_req, tuple(self.neighbors['prev']))
 
         else:
-            self.pending_table[self.hash_data(decoded_data)] = ['dirty', request]
+            self.pending_table[self.hash_data(decoded_data)] = ['dirty', request, request['username'], time.time(), False]
 
             # forward message to neighbor
             self.sock.sendto(data, tuple(self.neighbors['next_1']))
@@ -239,24 +239,45 @@ class Base_User:
         
         if request['prev'] != 'same':
             self.neighbors['prev'] = request['prev']
+            if request['cause'] == 'crash':
+                json_req = {
+                    "purpose": "disconnect",
+                    "next_1" : "same",
+                    "next_2" : self.neighbors['next_1'],
+                    "prev"   : "same",
+                    "cause"  : "crash"
+                }
+                req = json.dumps(json_req)
+                encoded_req = req.encode('utf-8')
+                self.sock.sendto(encoded_req, tuple(self.neighbors['prev'])) 
+                # now that the ordering is all fixed, forward the last message in the pening queue
+                
 
         elif request['next_1'] != 'same' and request['next_2'] != 'same':
+
             self.neighbors['next_1'] = request['next_1']
             self.neighbors['next_2'] = request['next_2']
-            json_req = {
-                "purpose": "disconnect",
-                "next_1" : "same",
-                "next_2" : self.neighbors['next_1'],
-                "prev"   : "same" 
-            }
-            req = json.dumps(json_req)
-            encoded_req = req.encode('utf-8')
-            self.sock.sendto(encoded_req, tuple(self.neighbors['prev'])) 
+            if request['cause'] == 'disconnect':
+                json_req = { "purpose": "disconnect",
+                    "next_1" : "same",
+                    "next_2" : self.neighbors['next_1'],
+                    "prev"   : "same",
+                    "cause"  : "disconnect"
+                }
+                req = json.dumps(json_req)
+                encoded_req = req.encode('utf-8')
+                self.sock.sendto(encoded_req, tuple(self.neighbors['prev'])) 
  
         elif request['next_2'] != 'same':
             if self.neighbors == {}:
                 return
             self.neighbors['next_2']  = request['next_2']
+            #TODO confirm that this is the correct message to send back
+            if request['cause'] == 'crash':
+                resumed_request = list(self.pending_table.values())[0][1]
+                req = json.dumps(resumed_request).encode('utf-8')
+                self.sock.sendto(req, tuple(self.neighbors['next_1']))
+                
 		
 		# case where system is super user and a single user
         if self.neighbors['next_1'] == self.neighbors['prev']:
@@ -265,11 +286,46 @@ class Base_User:
         # when super user is the only one left in the system
         if tuple(self.neighbors['next_1']) == (self.ip, self.port):
             self.neighbors = {}
+
 	
+    def handle_crash(self, request):
+        if tuple(self.neighbors['next_1']) != tuple(request['info']):
+            # forward to the next node
+            self.sock.sendto(json.dumps(request).encode('utf-8'), tuple(self.neighbors['next_1']))
+            return 
+        # next node is the crashed one, start reassigning neighbors
+        self.neighbors['next_1'] = self.neighbors['next_2']
+        # notify the prev node
+        
+        json_req = {
+            "purpose": "disconnect",
+            "next_1" : (self.ip, self.port),
+            "next_2" : self.neighbors['next_1'],
+            "prev"   : "same",
+            "cause"  : "crash"
+        }
+        req = json.dumps(json_req)
+        encoded_req = req.encode('utf-8')
+        self.sock.sendto(encoded_req, tuple(self.neighbors['prev'])) 
+        # notify the new next node this node will need to message back with the new next_2
+
+        json_req = {
+            "purpose": "disconnect",
+            "next_1" : "same",
+            "next_2" : "same",
+            "prev"   : (self.ip, self.port),
+            "cause"  : "crash"
+        }
+
+        req = json.dumps(json_req)
+        encoded_req = req.encode('utf-8')
+        self.sock.sendto(encoded_req, tuple(self.neighbors['next_1'])) 
+        
     
     def display(self, message_id):
         '''Internal method to display the message with a given id'''
-        
+        if message_id in self.history_table:
+            return
         req = self.pending_table[message_id][1]
         username = req['username']
         message = req['message']
