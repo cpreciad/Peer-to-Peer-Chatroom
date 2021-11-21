@@ -274,10 +274,11 @@ class Base_User:
             self.neighbors['next_2']  = request['next_2']
             #TODO confirm that this is the correct message to send back
             if request['cause'] == 'crash':
-                resumed_request = list(self.pending_table.values())[0][1]
-                req = json.dumps(resumed_request).encode('utf-8')
-                self.sock.sendto(req, tuple(self.neighbors['next_1']))
-                
+                if len(list(self.pending_table)):
+                    resumed_request = list(self.pending_table.values())[0][1]
+                    req = json.dumps(resumed_request).encode('utf-8')
+                    self.sock.sendto(req, tuple(self.neighbors['next_1']))
+                    
 		
 		# case where system is super user and a single user
         if self.neighbors['next_1'] == self.neighbors['prev']:

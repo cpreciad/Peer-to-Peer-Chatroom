@@ -53,7 +53,7 @@ class User(Base_User.Base_User):
 
         res = data.decode('utf-8')
         json_res = json.loads(res)
-      
+        print(json_res) 
         if (json_res["status"] == "success"):
             return json_res["leader"]
         elif (json_res["status"] == "failure"):
