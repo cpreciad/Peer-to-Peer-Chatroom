@@ -197,7 +197,7 @@ class User(Base_User.Base_User):
                 if read_s == sys.stdin:
                     usr_input = sys.stdin.readline()
                     if usr_input.strip() == "disconnect":
-                        if not check_pending:
+                        if not self.check_pending():
                             self.disconnect()
                             sys.exit(0)
                         else:
