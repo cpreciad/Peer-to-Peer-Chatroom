@@ -341,4 +341,3 @@ class Base_User:
         # add the message_id to the history table
         self.history_table.add(message_id)
 
-
