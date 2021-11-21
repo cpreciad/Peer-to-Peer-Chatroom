@@ -22,6 +22,7 @@ LOGIN_SERVER = ('', 9001)
 BYTES = 1024
 HOST = ''
 PORT = 9907
+TIMEOUT = 1
 
 
 class User(Base_User.Base_User):
@@ -39,7 +40,9 @@ class User(Base_User.Base_User):
 
         json_req = {
             "username": self.username,
-            "purpose": "connect"
+            "purpose" : "connect",
+            "ip"      : self.ip,
+            "port"    : self.port
         }
 
         req = json.dumps(json_req)
@@ -91,7 +94,8 @@ class User(Base_User.Base_User):
             "purpose": "disconnect",
             "next_1"   : "same",
             "next_2"   : "same",
-            "prev"   : self.neighbors['prev']
+            "prev"   : self.neighbors['prev'],
+            "cause"  : "disconnect"
         }
 
         req = json.dumps(json_req)
@@ -103,7 +107,8 @@ class User(Base_User.Base_User):
             "purpose": "disconnect",
             "next_1"   : self.neighbors['next_1'],
             "next_2"   : self.neighbors['next_2'],
-            "prev"   : "same"
+            "prev"   : "same",
+            "cause"  : "disconnect"
         }
 
         req = json.dumps(json_req)
@@ -164,6 +169,10 @@ class User(Base_User.Base_User):
         
         elif (purpose == "disconnect"):
             self.handle_disconnect(request)
+        elif (purpose == "checkup"):
+            self.sock.sendto(json.dumps({"status":"ok"}).encode('utf-8'),LOGIN_SERVER)
+        elif (purpose == "crash"):
+            self.handle_crash(request)
         else:
             print(f"Unknown purpose: {purpose}")
 
@@ -173,7 +182,7 @@ class User(Base_User.Base_User):
         
         while True:
 
-            rlist, _, _ = select.select([sys.stdin, self.sock], [], [])
+            rlist, _, _ = select.select([sys.stdin, self.sock], [], [], TIMEOUT)
 
             # user entered input
             for read_s in rlist:
@@ -188,4 +197,23 @@ class User(Base_User.Base_User):
                 # read incoming messages
                 else:
                     self.receive_message()
+            
+            # check if there have been any timeouts for a message at the top of the pending queue
+            if len(self.pending_table):
+                req  = list(self.pending_table.values())[0][1]
+                name = list(self.pending_table.values())[0][2]
+                user_time = list(self.pending_table.values())[0][3]
+                sent = list(self.pending_table.values())[0][4]
+                
+                if time.time() - user_time > TIMEOUT and name == self.username:
+                    if sent == False:
+                        # it's this users responsibility to prompt the checkins
+                        # tell the login server to check for timeouts
+                        self.sock.sendto(json.dumps({"purpose":"checkup"}).encode('utf-8'), LOGIN_SERVER)
+                        self.pending_table[list(self.pending_table.keys())[0]][4] = True
+                    else:
+                        self.sock.sendto(json.dumps(req).encode('utf-8'), tuple(self.neighbors['next_1']))
+
+
+            
 
