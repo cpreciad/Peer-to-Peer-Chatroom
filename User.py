@@ -176,6 +176,11 @@ class User(Base_User.Base_User):
         else:
             print(f"Unknown purpose: {purpose}")
 
+    def check_pending(self):
+        for key in self.pending_table:
+            if self.username == self.pending_table['username']:
+                return True
+        return False
 
     def listen(self):
         '''Function to listen for incoming messages (send or receive)'''
@@ -190,8 +195,11 @@ class User(Base_User.Base_User):
                 if read_s == sys.stdin:
                     usr_input = sys.stdin.readline()
                     if usr_input.strip() == "disconnect":
-                        self.disconnect()
-                        sys.exit(0)
+                        if not check_pending:
+                            self.disconnect()
+                            sys.exit(0)
+                        else:
+                            print('still processing messages, please try disconnecting later')
                     self.send_message(usr_input)
 
                 # read incoming messages
