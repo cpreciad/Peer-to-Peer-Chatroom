@@ -22,7 +22,7 @@ BUFSIZ = 4096
 
 SUPERUSER_PORT = 0 
 SUPERUSER_HOST = ''
-TIMEOUT = 1
+TIMEOUT = 0.1 
 
 
 def socket_bind():

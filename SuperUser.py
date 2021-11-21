@@ -21,7 +21,7 @@ LOGIN_SERVER = ('', 9001)
 HOST = ''
 PORT = 9060
 BYTES = 1024
-TIMEOUT = 3
+TIMEOUT = .5
 
 
 class SuperUser(Base_User.Base_User):
@@ -188,8 +188,9 @@ class SuperUser(Base_User.Base_User):
                         self.sock.sendto(json.dumps({"purpose":"checkup"}).encode('utf-8'), LOGIN_SERVER)
                         self.pending_table[list(self.pending_table.keys())[0]][4] = True
                     else:
-                       self.sock.sendto(json.dumps(req).encode('utf-8'),tuple(self.neighbors['next_1']))  
+                        self.sock.sendto(json.dumps(req).encode('utf-8'),tuple(self.neighbors['next_1']))  
 
+                
 if __name__ == '__main__':
 
     super_usr = SuperUser()
