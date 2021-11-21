@@ -1,67 +1,43 @@
 #!/usr/bin/env python3
 
-# TestPerformance.py
+# TestBasics.py
 # Authors: Kristen Friday, Carlo Preciado
 # Date: November 15, 2021
 #
-# TestPerformance.py evaluates the latency and throughput of message delivery
+# TestBasics.py evaluates basic functionality of chat system
 
 
 import User
 import time
 
 
-def test_direct():
-    '''Measure latency and throughput of direct messaging'''
+def test_direct(usr):
+    '''Test functionality of direct messaging'''
     
-    usr = User.User("test_user1")
-    usr.connect()
-
-    start = time.time_ns()
-    elapsed = 0
-    count = 0
-
-    while elapsed <= 3000000000:
-        usr.direct_message("super_user", "test message")
-        count += 1
-
-        elapsed = time.time_ns() - start
-
-    print("Performance of Direct Messaging:")
-    print(f"Elapsed Time:          {(elapsed / (10 ** 9))} seconds")
-    print(f"Total Operations:      {count} operations")
-    print(f"Bandwith (ops/sec):    {count / (elapsed / (10 ** 9)):.0f} ops/second")
-    print(f"Latency (avg time/op): {(elapsed / count):.0f} nanoseconds/op\n")
+    usr.direct_message("super_user", "test direct message")
+    # receive response
+    usr.receive_message()
 
 
-def test_global():
-    '''Measure latency and throughput of global messaging'''
+def test_global(usr):
+    '''Test functionality of global messaging'''
     
-    usr = User.User("test_user1")
-    usr.connect()
-
-    start = time.time_ns()
-    elapsed = 0
-    count = 0
-
-    while elapsed <= 3000000000:
-        usr.send_message("test message")
-        count += 1
-
-        elapsed = time.time_ns() - start
-
-    print("Performance of Global Messaging:")
-    print(f"Elapsed Time:          {(elapsed / (10 ** 9))} seconds")
-    print(f"Total Operations:      {count} operations")
-    print(f"Bandwith (ops/sec):    {count / (elapsed / (10 ** 9)):.0f} ops/second")
-    print(f"Latency (avg time/op): {(elapsed / count):.0f} nanoseconds/op\n")
+    usr.send_message("test global message")
+    # receive original message
+    usr.receive_message()
+    # receive global response
+    usr.receive_message()
 
 
 def main():
     '''Runner function for performance testing'''
 
-    #test_direct();
-    test_global();
+    usr = User.User("test_user1")
+    usr.username = f"test_user{usr.port}"
+    usr.connect()
+
+    test_direct(usr);
+    test_global(usr);
 
 
 if __name__ == '__main__':

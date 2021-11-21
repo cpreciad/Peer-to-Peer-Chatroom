@@ -167,7 +167,7 @@ class Base_User:
             encoded = res.encode('utf-8')
             
             # display message
-            self.pending_table[self.hash_data(decoded_data)][0] = "clean"
+            self.pending_table[self.hash_data(decoded_data)] = ["clean", message]
             self.display(self.hash_data(decoded_data))
             self.sock.sendto(encoded, source)
 
@@ -248,7 +248,6 @@ class Base_User:
         if tuple(self.neighbors['next_1']) == (self.ip, self.port):
             self.neighbors = {}
 	
-        print(self.neighbors)
     
     def display(self, message_id):
         '''Internal method to display the message with a given id'''
@@ -265,6 +264,5 @@ class Base_User:
 
         # remove from pending table
         self.pending_table.pop(message_id)
-
 
 

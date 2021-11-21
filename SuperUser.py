@@ -30,11 +30,11 @@ class SuperUser(Base_User.Base_User):
 
     def add_users(self, req):
         '''Method to listen for incoming clients and add to chat system'''
+
         location = (req["ip"], req["port"])
         new_next = (self.ip, self.port)
         new_next_next = None
 
-        print(self.neighbors)
         # if other users, inform the next user
         if "next_1" in self.neighbors:
 
@@ -56,7 +56,6 @@ class SuperUser(Base_User.Base_User):
                 # request current next's next neighbor
                 self.sock.sendto(update, tuple(self.neighbors["next_1"]))
                 up_res = self.sock.recv(BYTES)
-                print(up_res)
                 json_up_res = json.loads(up_res.decode('utf-8'))
 
                 if (json_up_res["status"] == "success"):
@@ -109,7 +108,7 @@ class SuperUser(Base_User.Base_User):
         decoded_data = data.decode('utf-8')
         request = json.loads(decoded_data)
         purpose = request['purpose']
-        
+       
         # process the request accordingly
         if purpose == 'global':
             self.handle_global(request)

@@ -119,6 +119,7 @@ class User(Base_User.Base_User):
         encoded_req = req.encode('utf-8')
         self.sock.sendto(encoded_req, LOGIN_SERVER)
 
+
     def receive_message(self):
         '''Listen for incoming messages and process accordingly'''
 
@@ -168,7 +169,7 @@ class User(Base_User.Base_User):
 
 
     def listen(self):
-        '''Function to listen for incoming messages'''
+        '''Function to listen for incoming messages (send or receive)'''
         
         while True:
 
