@@ -31,7 +31,7 @@ class Base_User:
         self.neighbors = {}
         self.pending_table = collections.OrderedDict() # pending
         self.history_table = set()
-        self.message_count = 0
+        self.message_count = time.time()
 
         self.ip = socket.gethostbyname(socket.gethostname())
        
@@ -68,7 +68,7 @@ class Base_User:
             encodes the message and add it to the message queue
         '''
         
-        self.message_count += 1
+        self.message_count = time.time()
 
         if message.strip() == "direct":
             user = input('@')

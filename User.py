@@ -22,7 +22,7 @@ LOGIN_SERVER = ('', 9001)
 BYTES = 1024
 HOST = ''
 PORT = 9907
-TIMEOUT = 1
+TIMEOUT = .5
 
 
 class User(Base_User.Base_User):
@@ -204,7 +204,7 @@ class User(Base_User.Base_User):
                 name = list(self.pending_table.values())[0][2]
                 user_time = list(self.pending_table.values())[0][3]
                 sent = list(self.pending_table.values())[0][4]
-                
+                 
                 if time.time() - user_time > TIMEOUT and name == self.username:
                     if sent == False:
                         # it's this users responsibility to prompt the checkins
