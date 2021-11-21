@@ -91,7 +91,7 @@ def process_request(server_socket, data, leader_info, name_list):
         if request['username'] in name_list or (request['ip'], request['port']) in name_list.values():
             # send a request for a names list to the user
             # if username in new name_list, respond with failure
-            message = {"status": "failure", "error": "un-unique name or (IP,PORT)" }
+            message = {"status": "failure", "error": "un-unique" }
             message = json.dumps(message).encode('utf-8')
 
             return ((message, data['ip'], data['port']), name_list)
@@ -100,7 +100,8 @@ def process_request(server_socket, data, leader_info, name_list):
             # check that the system is fine before adding the user to the system
             name_list, user_crash = check_on_users(server_socket, name_list, leader_info)
             if user_crash:
-                message = {"status": "failure", "error": "server temporarily down"}
+                message = {"status": "failure", "error": "server_down"}
+                message = json.dumps(message).encode('utf-8')
                 return ((message, data['ip'], data['port']), name_list)
                 
             name_list[request['username']] = (request['ip'], request['port'])

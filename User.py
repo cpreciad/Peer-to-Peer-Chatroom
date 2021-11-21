@@ -58,7 +58,9 @@ class User(Base_User.Base_User):
             return json_res["leader"]
         elif (json_res["status"] == "failure"):
             if (json_res["error"]) == "un-unique":
-                raise Exception(f'The Username ({self.username}) is already in use')
+                raise Exception(f'The Username or (IP,PORT) is already in use')
+            if (json_res["error"]) == "server_down":
+                raise Exception(f'Sever temporarily down, please try again soon')
  
 
     def connect(self):
