@@ -7,12 +7,12 @@
 # The Base User class defines a basic implementation of a node in the chat system
 # It serves as the abstraction template for basic functionality
 
+import select
+import sys
 import socket
 import json
 import hashlib
 import time
-import select
-import sys
 import collections
 
 
@@ -35,7 +35,7 @@ class Base_User:
 
         self.ip = socket.gethostbyname(socket.gethostname())
        
-        # "server" socket to listen for other peer's messages
+        # socket to listen for and send messages
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		# find a port to bind to, which is in the range from 9000-9999
         for port_num in range(9000, 10000):
@@ -64,18 +64,22 @@ class Base_User:
     def send_message(self, message):
         ''' Send a global message to all nodes in ring
             
-            really just an abstraction for adding a message to a message queue
-            encodes the message and add it to the message queue
+            - takes in a string input message
+            - adds message to pending table and forwards to neighbor
         '''
-        
+
+        if not self.neighbors:
+            print("No other users in the chat room")
+            return
+
         self.message_count += 1
 
         if message.strip() == "direct":
             user = input('@')
-            content = input(f'(@{user})> ') 
+            content = input(f'(@{user})> ')
             self.direct_message(user, content)
             return
-        
+
         json_req = {
             "username"      : self.username,
             "purpose"       : "global",
@@ -89,14 +93,19 @@ class Base_User:
         encoded_req = req.encode('utf-8')
 
         # add transaction to pending; mark as dirty (not yet displayed)
-        self.pending_table[self.hash_data(req)] = ['dirty', json_req, self.username, time.time(), False]
+        self.pending_table[self.hash_data(req)] = [
+                'dirty', json_req, self.username, time.time(), False]
 
         # forward message to neighbor
         self.sock.sendto(encoded_req, tuple(self.neighbors['next_1']))
 
 
     def direct_message(self, username, message):
-        '''Send a direct message to a target user'''
+        ''' Send a direct message to a target user
+            
+            - takes in a string username and a string message
+            - adds message to pending table and forwards to neighbor
+        '''
 
         message = {
             "username"     : self.username,
@@ -112,7 +121,8 @@ class Base_User:
         encoded = req.encode('utf-8');
 
         # add transaction to pending
-        self.pending_table[self.hash_data(req)] = ['dirty', message, self.username, time.time(), False]
+        self.pending_table[self.hash_data(req)] = [
+                'dirty', message, self.username, time.time(), False]
 
         # forward message to neighbor
         self.sock.sendto(encoded, tuple(self.neighbors['next_1']))
@@ -147,19 +157,39 @@ class Base_User:
         self.sock.sendto(res, leader)
   
 
-    def handle_direct(self, message):
-        '''Handling the receival of a direct message'''
+    def handle_direct(self, message, sender):
+        ''' Handle the receival of a direct message
+        
+            - if target username matches self, display message and send back response
+            - else forward message around the ring
+        '''
 
         decoded_data = json.dumps(message)
 
         # check if message made it to sender without finding target
         if (self.username == message["username"]):
             print(f'{message["target"]} does not exist')
+            # remove transaction from pending
+            self.pending_table.pop(self.hash_data(decoded_data))
             return
+
+        # check if sender does not match previous neighbor
+        # ie previous node does not know it has been kicked out
+        elif (self.neighbors["prev"] != list(sender)):
+            json_res = {
+                "username"  : self.username,
+                "ip"        : self.ip,
+                "port"      : self.port,
+                "purpose"   : "kicked_out"
+            } 
+           
+            res = json.dumps(json_res)
+            encoded = res.encode('utf-8')
+            self.sock.sendto(encoded, sender)
 
         # check if username matches target
         elif (self.username == message["target"]):
-            source = (message["ip"], message["port"])
+            source = [message["ip"], message["port"]]
             json_res = {
                 "username"  : self.username,
                 "ip"        : self.ip,
@@ -173,9 +203,10 @@ class Base_User:
             encoded = res.encode('utf-8')
             
             # display message
-            self.pending_table[self.hash_data(decoded_data)] = ["clean", message, message['username'], time.time(), False]  
+            self.pending_table[self.hash_data(decoded_data)] = [
+                    "clean", message, message['username'], time.time(), False] 
             self.display(self.hash_data(decoded_data))
-            self.sock.sendto(encoded, source)
+            self.sock.sendto(encoded, tuple(source))
 
         # otherwise forward message to next
         else:
@@ -184,34 +215,35 @@ class Base_User:
             self.sock.sendto(message, tuple(self.neighbors["next_1"]))
 
 
-    def handle_global(self, request):
-        '''
-            simply add the request to the message queue and 
-            let the main program handle this, unless its from itself,
-            then start acknowledgement test
+    def handle_global(self, request, sender):
+        ''' Handle the receival of global messages
+
+            - determine if pending transaction is already in history (complete)
+            - if the sender matches self, the message has traveled all
+              the way around the ring and should send a global response
+            - else add to pending table and forward to neighbors
         '''
 
         decoded_data = json.dumps(request)
         data = decoded_data.encode('utf-8')
 
         # global acknowledgement response, for when message has either
-        # circulated through entire ring, or message has reached a User 
+        # circulated through entire ring, or message has reached a User
         # who has already seen the message
 
         json_req = {
             "username"    : self.username,
             "purpose"     : "global_response",
-            "message_id"  : self.hash_data(decoded_data) 
+            "message_id"  : self.hash_data(decoded_data)
         }
         req = json.dumps(json_req)
         encoded_req = req.encode('utf-8')
 
-        # check if incoming data is already in the hisory table
+        # check if incoming data is already in the history table
         if self.hash_data(decoded_data) in self.history_table:
             # send back the acknowledgement messages
             self.sock.sendto(encoded_req, tuple(self.neighbors['prev']))
-            return 
-
+            return
 
         # reach end of ring; send back response
         if request['username'] == self.username:
@@ -223,17 +255,33 @@ class Base_User:
             if self.hash_data(decoded_data) == list(self.pending_table.keys())[0]:
                 # message to prev neighbor
                 self.sock.sendto(encoded_req, tuple(self.neighbors['prev']))
+        
+        # check if sender does not match previous neighbor
+        # ie previous node does not know it has been kicked out
+        elif (self.neighbors["prev"] != list(sender)):
+            json_res = {
+                "username"  : self.username,
+                "ip"        : self.ip,
+                "port"      : self.port,
+                "purpose"   : "kicked_out"
+            } 
+            
+            res = json.dumps(json_res)
+            encoded = res.encode('utf-8')
+            self.sock.sendto(encoded, sender)
 
         else:
-            self.pending_table[self.hash_data(decoded_data)] = ['dirty', request, request['username'], time.time(), False]
+            self.pending_table[self.hash_data(decoded_data)] = [
+                    'dirty', request, request['username'], time.time(), False]
 
             # forward message to neighbor
             self.sock.sendto(data, tuple(self.neighbors['next_1']))
 
 
     def handle_disconnect(self, request):
-        '''
-            recieves a disconnect request, updates either the prev or 
+        ''' Handle clean exit of users
+            
+            - recieves a disconnect request -> updates either the prev or 
             next neighbor
         '''
         
@@ -250,7 +298,6 @@ class Base_User:
                 req = json.dumps(json_req)
                 encoded_req = req.encode('utf-8')
                 self.sock.sendto(encoded_req, tuple(self.neighbors['prev'])) 
-                # now that the ordering is all fixed, forward the last message in the pening queue
                 
 
         elif request['next_1'] != 'same' and request['next_2'] != 'same':
@@ -258,7 +305,8 @@ class Base_User:
             self.neighbors['next_1'] = request['next_1']
             self.neighbors['next_2'] = request['next_2']
             if request['cause'] == 'disconnect':
-                json_req = { "purpose": "disconnect",
+                json_req = { 
+                    "purpose": "disconnect",
                     "next_1" : "same",
                     "next_2" : self.neighbors['next_1'],
                     "prev"   : "same",
@@ -273,7 +321,7 @@ class Base_User:
                 return
             self.neighbors['next_2']  = request['next_2']
             #TODO confirm that this is the correct message to send back
-            if request['cause'] == 'crash':
+            if request['cause'] == 'crash' and self.pending_table:
                 resumed_request = list(self.pending_table.values())[0][1]
                 req = json.dumps(resumed_request).encode('utf-8')
                 self.sock.sendto(req, tuple(self.neighbors['next_1']))
@@ -281,7 +329,7 @@ class Base_User:
 		
 		# case where system is super user and a single user
         if self.neighbors['next_1'] == self.neighbors['prev']:
-            self.neighbors['next_2'] = None
+            self.neighbors.pop('next_2')
         
         # when super user is the only one left in the system
         if tuple(self.neighbors['next_1']) == (self.ip, self.port):
@@ -289,14 +337,18 @@ class Base_User:
 
 	
     def handle_crash(self, request):
+        '''Update pointers in the event of a node crash to preserve ring'''
+
         if tuple(self.neighbors['next_1']) != tuple(request['info']):
             # forward to the next node
-            self.sock.sendto(json.dumps(request).encode('utf-8'), tuple(self.neighbors['next_1']))
-            return 
+            self.sock.sendto(json.dumps(
+                request).encode('utf-8'), tuple(self.neighbors['next_1']))
+            return
+
         # next node is the crashed one, start reassigning neighbors
         self.neighbors['next_1'] = self.neighbors['next_2']
-        # notify the prev node
         
+        # notify the prev node
         json_req = {
             "purpose": "disconnect",
             "next_1" : (self.ip, self.port),
@@ -307,8 +359,8 @@ class Base_User:
         req = json.dumps(json_req)
         encoded_req = req.encode('utf-8')
         self.sock.sendto(encoded_req, tuple(self.neighbors['prev'])) 
-        # notify the new next node this node will need to message back with the new next_2
 
+        # notify new next node this node will need to message back with the new next_2
         json_req = {
             "purpose": "disconnect",
             "next_1" : "same",

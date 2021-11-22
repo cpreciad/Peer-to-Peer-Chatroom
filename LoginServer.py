@@ -40,7 +40,6 @@ def socket_bind():
             s.bind((HOST,port))
         except OSError:
             continue
-            
 
     return s
 
@@ -74,17 +73,23 @@ def process_request(server_socket, data, leader_info, name_list):
 
     '''
     
-    #TODO come up with different ways to process request 
-   
     # reassign the name_list
-    request = json.loads(data['request'])
-    
+    try:
+        request = json.loads(data['request'])
+    except json.decoder.JSONDecodeError:
+        # invalid json; garbase request
+        return (None, name_list)
+   
+    print(request)
     if request['purpose'] == 'checkup':
         name_list = check_on_users(server_socket, name_list, leader_info)
         return (None, name_list)
 
     if request['purpose'] == 'disconnect':
         name_list.pop(request['username'])
+        return (None, name_list)
+
+    if request['purpose'] == 'checkup_res':
         return (None, name_list)
 
     if request['purpose'] == 'connect':
@@ -99,7 +104,11 @@ def process_request(server_socket, data, leader_info, name_list):
             # add the username to the list continue on
             name_list[request['username']] = (request['ip'], request['port'])
 
-    leader_ip, leader_port = leader_info 
+    leader_ip, leader_port = leader_info
+    try:
+        leader_ip = socket.gethostbyname(socket.gethostname())
+    except socket.error:
+        pass
     
     message = {"status": "success", "leader": (leader_ip, leader_port)}
     message = json.dumps(message).encode('utf-8')
@@ -115,39 +124,50 @@ def send_response(server_socket, response_package):
     message, ip, port = response_package
     server_socket.sendto(message, (ip, port))
 
-def send_alert(username, user_info, server_socket, leader_info):
-    '''Send a crash alert to the super user, figure out which node in the system crashed'''
 
-    json_req = {"purpose" : "crash",
-                "username": username,
-                "info"    : user_info}
+def send_alert(username, user_info, server_socket, leader_info):
+    ''' Send a crash alert to the super user
+        - figure out which node in the system crashed
+    '''
+
+    json_req = {
+        "purpose" : "crash",
+        "username": username,
+        "info"    : user_info
+    }
+
     req = json.dumps(json_req)
     encoded_req = req.encode('utf-8')
     server_socket.sendto(encoded_req, leader_info) 
 
-
     print(f"{username} has crashed")
 
+
 def check_on_users(server_socket, name_list, leader_info):
+    '''Poll users in system to check if still alive'''
+    
     # temporarily set a timeout to recieve
     server_socket.settimeout(TIMEOUT)
     names_to_remove = []
     for key in name_list:
-        server_socket.sendto(json.dumps({"purpose": "checkup"}).encode('utf-8'), name_list[key])
+        server_socket.sendto(json.dumps(
+            {"purpose": "checkup"}).encode('utf-8'), name_list[key])
         try:
             data = server_socket.recv(BUFSIZ)
         except socket.timeout:
-            # if a response hasnt been recieved before 5 seconds, send a disconnection alert and remove the username
+            # if a response hasnt been received before 5 seconds, 
+            # send a disconnection alert and remove the username
             send_alert(key, name_list[key], server_socket, leader_info)
             names_to_remove.append(key)
     
     # set the time back
+    server_socket.settimeout(None)
     
     for key in names_to_remove:
         name_list.pop(key)
 
-    server_socket.settimeout(None)
     return name_list
+
 
 def run_server(leader_info):
     '''
@@ -165,17 +185,23 @@ def run_server(leader_info):
     print(f'LoginServer listening on port {port}...')
     while True:
         rlist, _, _ = select.select([server_socket], [], [])
-        if rlist != []:
+        if rlist:
             data  = receive_request(server_socket) 
-            response_package, name_list = process_request(server_socket, data, leader_info, name_list)
+            response_package, name_list = process_request(
+                    server_socket, 
+                    data, 
+                    leader_info, 
+                    name_list
+                )
+
             print('Users in Chat Room: ', end='')
             print(name_list)
+
             if response_package == None:
                 continue
             send_response(server_socket, response_package)
         else:
-            check_on_users(server_socket, name_list)
-
+            check_on_users(server_socket, name_list, leader_info)
         
 
 def usage():
