@@ -49,14 +49,28 @@ class User(Base_User.Base_User):
         encoded_req = req.encode('utf-8')
 
         self.sock.sendto(encoded_req, LOGIN_SERVER)
-        data = self.sock.recv(BYTES)
+
+        # throw exception if LoginServer doesn't respond in 3 seconds
+        self.sock.settimeout(3)
+        try:
+            data = self.sock.recv(BYTES)
+            self.sock.settimeout(None)
+        except socket.timeout:
+            print(f"User {self.username} could not connect to LoginServer")
+            sys.exit(-1)
+          
 
         res = data.decode('utf-8')
         json_res = json.loads(res)
-        print(json_res) 
-        if (json_res["status"] == "success"):
+        try:
+            status = json_res["status"]
+        except KeyError:
+            print(f"User {self.username} could not connect to LoginServer")
+            sys.exit(-1)
+
+        if (status == "success"):
             return json_res["leader"]
-        elif (json_res["status"] == "failure"):
+        else:
             if (json_res["error"]) == "un-unique":
                 raise Exception(f'The Username or (IP,PORT) is already in use')
             if (json_res["error"]) == "server_down":
@@ -89,15 +103,15 @@ class User(Base_User.Base_User):
 
     
     def disconnect(self):
-        '''Allow user to exit chat ring'''
+        '''Allow user to cleanly exit chat ring'''
         
         # make the first disconnection request to the next neighbor
         json_req = {
-            "purpose": "disconnect",
+            "purpose"  : "disconnect",
             "next_1"   : "same",
             "next_2"   : "same",
-            "prev"   : self.neighbors['prev'],
-            "cause"  : "disconnect"
+            "prev"     : self.neighbors['prev'],
+            "cause"    : "disconnect"
         }
 
         req = json.dumps(json_req)
@@ -106,11 +120,11 @@ class User(Base_User.Base_User):
 
         # make the second disconnection request to the prev neighbors
         json_req = {
-            "purpose": "disconnect",
+            "purpose"  : "disconnect",
             "next_1"   : self.neighbors['next_1'],
             "next_2"   : self.neighbors['next_2'],
-            "prev"   : "same",
-            "cause"  : "disconnect"
+            "prev"     : "same",
+            "cause"    : "disconnect"
         }
 
         req = json.dumps(json_req)
@@ -125,6 +139,7 @@ class User(Base_User.Base_User):
         req = json.dumps(json_req)
         encoded_req = req.encode('utf-8')
         self.sock.sendto(encoded_req, LOGIN_SERVER)
+        sys.exit(0)
 
 
     def receive_message(self):
@@ -138,7 +153,7 @@ class User(Base_User.Base_User):
 
         # process the request accordingly
         if purpose == 'global':
-            self.handle_global(request)
+            self.handle_global(request, addr)
 
         elif purpose == 'global_response':
             # display the message
@@ -149,7 +164,7 @@ class User(Base_User.Base_User):
                 if self.pending_table:
                     first_val = list(self.pending_table.values())[0]
                     if first_val[0] == "clean":
-                        self.handle_global(first_val[1])
+                        self.handle_global(first_val[1], [self.ip, self.port])
 
                 # stop forwarding the acknowledgement along
                 return
@@ -158,7 +173,7 @@ class User(Base_User.Base_User):
                 self.sock.sendto(data, tuple(self.neighbors['prev']))
         
         elif purpose == 'dm_response':
-            # put private message into display queue
+            # display private message
             self.display(request['message_id'])
 
         # update pointers for a new node
@@ -167,14 +182,23 @@ class User(Base_User.Base_User):
         
         # direct message
         elif (purpose == "direct"):
-            self.handle_direct(request)
+            self.handle_direct(request, addr)
         
         elif (purpose == "disconnect"):
             self.handle_disconnect(request)
+
         elif (purpose == "checkup"):
-            self.sock.sendto(json.dumps({"status":"ok"}).encode('utf-8'),LOGIN_SERVER)
+            self.sock.sendto(json.dumps({
+                "status":"ok",
+                "purpose": "checkup_res"}).encode('utf-8'),LOGIN_SERVER)
+        
         elif (purpose == "crash"):
             self.handle_crash(request)
+
+        elif (purpose == "kicked_out"):
+            print("Disconnected from chat room. Please retry logging in.")
+            sys.exit(-1)
+        
         else:
             print(f"Unknown purpose: {purpose}")
 
@@ -207,22 +231,26 @@ class User(Base_User.Base_User):
                 # read incoming messages
                 else:
                     self.receive_message()
-            
-            # check if there have been any timeouts for a message at the top of the pending queue
-            if len(self.pending_table):
-                req  = list(self.pending_table.values())[0][1]
-                name = list(self.pending_table.values())[0][2]
-                user_time = list(self.pending_table.values())[0][3]
-                sent = list(self.pending_table.values())[0][4]
-                 
+
+            # check if there have been timeouts for a message at top of pending queue
+            if self.pending_table:
+                top = list(self.pending_table.values())[0]
+                req  = top[1]
+                name = top[2]
+                user_time = top[3]
+                sent = top[4]
+                
                 if time.time() - user_time > TIMEOUT and name == self.username:
                     if sent == False:
                         # it's this users responsibility to prompt the checkins
                         # tell the login server to check for timeouts
-                        self.sock.sendto(json.dumps({"purpose":"checkup"}).encode('utf-8'), LOGIN_SERVER)
-                        self.pending_table[list(self.pending_table.keys())[0]][4] = True
+                        self.sock.sendto(json.dumps(
+                            {"purpose":"checkup"}).encode('utf-8'), LOGIN_SERVER)
+                        self.pending_table[
+                                list(self.pending_table.keys())[0]][4] = True
                     else:
-                        self.sock.sendto(json.dumps(req).encode('utf-8'), tuple(self.neighbors['next_1']))
+                        self.sock.sendto(json.dumps(
+                            req).encode('utf-8'), tuple(self.neighbors['next_1']))
 
 
             

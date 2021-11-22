@@ -33,13 +33,13 @@ class SuperUser(Base_User.Base_User):
     def add_users(self, req):
         '''Method to listen for incoming clients and add to chat system'''
 
-        location = (req["ip"], req["port"])
-        new_next = (self.ip, self.port)
+        location = [req["ip"], req["port"]]
+        new_next = [self.ip, self.port]
         new_next_next = None
 
+        leader = [self.ip, self.port]
         # if other users, inform the next user
         if "next_1" in self.neighbors:
-
             new_next = self.neighbors["next_1"]
 
             update = {
@@ -47,6 +47,7 @@ class SuperUser(Base_User.Base_User):
                 "prev": location
             }
 
+            # attempt 5 retries to get next neighbor
             count = 0
             while True:
                 if count >= 5:
@@ -74,7 +75,6 @@ class SuperUser(Base_User.Base_User):
             }
             while True:
                 if count >= 5:
-                    print("SuperUser: Unable to update next_2")
                     return
 
                 update = json.dumps(update).encode('utf-8')
@@ -100,20 +100,26 @@ class SuperUser(Base_User.Base_User):
 
         res = json.dumps(json_res).encode('utf-8')
         print(f'Added User {req["username"]}')
-        self.sock.sendto(res, location)
+        self.sock.sendto(res, tuple(location))
 
     
     def receive_message(self):
+        ''' Process incoming messages according to their purpose '''
         
         # main listening loop
         data, addr = self.sock.recvfrom(BYTES)
         decoded_data = data.decode('utf-8')
-        request = json.loads(decoded_data)
+        try:
+            request = json.loads(decoded_data)
+        except json.decoder.JSONDecodeError:
+            # invalid json; garbage request
+            return
+
         purpose = request['purpose']
        
         # process the request accordingly
         if purpose == 'global':
-            self.handle_global(request)
+            self.handle_global(request, addr)
             
         elif purpose == 'global_response':
             # display the message
@@ -124,7 +130,7 @@ class SuperUser(Base_User.Base_User):
                 if self.pending_table:
                     first_val = list(self.pending_table.values())[0]
                     if first_val[0] == "clean":
-                        self.handle_global(self.pending_table.values()[0])
+                        self.handle_global(first_val[1], [self.ip, self.port])
 
                 # stop forwarding the acknowledgement along
                 return
@@ -142,17 +148,20 @@ class SuperUser(Base_User.Base_User):
         
         # direct message
         elif (purpose == "direct"):
-            self.handle_direct(request)
+            self.handle_direct(request, addr)
 
         elif (purpose == "connect"):
             self.add_users(request)
 
         elif (purpose == "disconnect"):
             self.handle_disconnect(request)
+
         elif (purpose == "checkup"):
             self.sock.sendto(json.dumps({"status":"ok"}).encode('utf-8'), LOGIN_SERVER)
+        
         elif (purpose == "crash"):
             self.handle_crash(request)
+        
         else:
             print(f"Unknown purpose: {purpose}")
             
@@ -174,19 +183,23 @@ class SuperUser(Base_User.Base_User):
                 # read incoming messages
                 else:
                     self.receive_message()
-			# check if there have been any timeouts for a message at the top of the pending queue
-            if len(self.pending_table):
-                req = list(self.pending_table.values())[0][1]
-                name = list(self.pending_table.values())[0][2]
-                user_time = list(self.pending_table.values())[0][3]
-                sent = list(self.pending_table.values())[0][4]
+			
+            # check if there have been timeouts for a message at top of pending queue
+            if self.pending_table:
+                top = list(self.pending_table.values())[0]
+                req = top[1]
+                name = top[2]
+                user_time = top[3]
+                sent = top[4]
     
                 if time.time() - user_time > TIMEOUT and name == self.username:
                     if sent == False:
                         # it's this users responsibility to prompt the checkins
                         # tell the login server to check for timeouts
-                        self.sock.sendto(json.dumps({"purpose":"checkup"}).encode('utf-8'), LOGIN_SERVER)
-                        self.pending_table[list(self.pending_table.keys())[0]][4] = True
+                        self.sock.sendto(json.dumps(
+                            {"purpose":"checkup"}).encode('utf-8'), LOGIN_SERVER)
+                        self.pending_table[
+                                list(self.pending_table.keys())[0]][4] = True
                     else:
                         self.sock.sendto(json.dumps(req).encode('utf-8'),tuple(self.neighbors['next_1']))  
 

@@ -6,9 +6,10 @@
 #
 # TestBasics.py evaluates basic functionality of chat system
 
-
-import User
+import sys
 import time
+import select
+import User
 
 
 def test_direct(usr):
@@ -32,12 +33,31 @@ def test_global(usr):
 def main():
     '''Runner function for performance testing'''
 
-    usr = User.User("test_user1")
-    usr.username = f"test_user{usr.port}"
-    usr.connect()
+    usr1 = User.User("test_user1")
+    usr1.username = f"test_user{time.time()}"
+    usr1.print_user()
+    usr1.connect()
+    
+    socks = [sys.stdin, usr1.sock]
+    while True:
 
-    test_direct(usr);
-    test_global(usr);
+        rlist, _, _ = select.select(socks, [], [], 1)
+
+        # user entered input
+        for read_s in rlist:
+            # read input
+            if read_s == sys.stdin:
+                usr_input = sys.stdin.readline().strip()
+                if not usr_input:
+                    socks.pop(0)
+                    break
+
+                else:
+                    usr1.send_message(usr_input)
+
+            # read incoming messages
+            else:
+                usr1.receive_message()
 
 
 if __name__ == '__main__':
