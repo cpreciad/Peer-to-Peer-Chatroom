@@ -22,7 +22,7 @@ LOGIN_SERVER = ('', 9001)
 BYTES = 1024
 HOST = ''
 PORT = 9907
-TIMEOUT = 1
+TIMEOUT = .5
 
 
 class User(Base_User.Base_User):
@@ -62,7 +62,6 @@ class User(Base_User.Base_User):
 
         res = data.decode('utf-8')
         json_res = json.loads(res)
-     
         try:
             status = json_res["status"]
         except KeyError:
@@ -71,9 +70,11 @@ class User(Base_User.Base_User):
 
         if (status == "success"):
             return json_res["leader"]
-        elif (json_res["status"] == "failure"):
+        else:
             if (json_res["error"]) == "un-unique":
-                raise Exception(f'The Username ({self.username}) is already in use')
+                raise Exception(f'The Username or (IP,PORT) is already in use')
+            if (json_res["error"]) == "server_down":
+                raise Exception(f'Sever temporarily down, please try again soon')
  
 
     def connect(self):
@@ -201,6 +202,11 @@ class User(Base_User.Base_User):
         else:
             print(f"Unknown purpose: {purpose}")
 
+    def check_pending(self):
+        for key in self.pending_table:
+            if self.username == self.pending_table['username']:
+                return True
+        return False
 
     def listen(self):
         '''Function to listen for incoming messages (send or receive)'''
@@ -215,13 +221,17 @@ class User(Base_User.Base_User):
                 if read_s == sys.stdin:
                     usr_input = sys.stdin.readline()
                     if usr_input.strip() == "disconnect":
-                        self.disconnect()
+                        if not self.check_pending():
+                            self.disconnect()
+                            sys.exit(0)
+                        else:
+                            print('still processing messages, please try disconnecting later')
                     self.send_message(usr_input)
 
                 # read incoming messages
                 else:
                     self.receive_message()
-            
+
             # check if there have been timeouts for a message at top of pending queue
             if self.pending_table:
                 top = list(self.pending_table.values())[0]

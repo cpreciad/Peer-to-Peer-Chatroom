@@ -31,7 +31,7 @@ class Base_User:
         self.neighbors = {}
         self.pending_table = collections.OrderedDict() # pending
         self.history_table = set()
-        self.message_count = 0
+        self.message_count = time.time()
 
         self.ip = socket.gethostbyname(socket.gethostname())
        
@@ -71,8 +71,8 @@ class Base_User:
         if not self.neighbors:
             print("No other users in the chat room")
             return
-
-        self.message_count += 1
+        
+        self.message_count = time.time()
 
         if message.strip() == "direct":
             user = input('@')
@@ -325,7 +325,6 @@ class Base_User:
                 resumed_request = list(self.pending_table.values())[0][1]
                 req = json.dumps(resumed_request).encode('utf-8')
                 self.sock.sendto(req, tuple(self.neighbors['next_1']))
-                
 		
 		# case where system is super user and a single user
         if self.neighbors['next_1'] == self.neighbors['prev']:

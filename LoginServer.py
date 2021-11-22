@@ -22,7 +22,7 @@ BUFSIZ = 4096
 
 SUPERUSER_PORT = 0 
 SUPERUSER_HOST = ''
-TIMEOUT = 1
+TIMEOUT = 0.1 
 
 
 def socket_bind():
@@ -82,7 +82,7 @@ def process_request(server_socket, data, leader_info, name_list):
    
     print(request)
     if request['purpose'] == 'checkup':
-        name_list = check_on_users(server_socket, name_list, leader_info)
+        name_list, user_crash = check_on_users(server_socket, name_list, leader_info)
         return (None, name_list)
 
     if request['purpose'] == 'disconnect':
@@ -93,15 +93,22 @@ def process_request(server_socket, data, leader_info, name_list):
         return (None, name_list)
 
     if request['purpose'] == 'connect':
-        if request['username'] in name_list:
+        if request['username'] in name_list or (request['ip'], request['port']) in name_list.values():
             # send a request for a names list to the user
             # if username in new name_list, respond with failure
             message = {"status": "failure", "error": "un-unique" }
             message = json.dumps(message).encode('utf-8')
+
             return ((message, data['ip'], data['port']), name_list)
 
         else:
-            # add the username to the list continue on
+            # check that the system is fine before adding the user to the system
+            name_list, user_crash = check_on_users(server_socket, name_list, leader_info)
+            if user_crash:
+                message = {"status": "failure", "error": "server_down"}
+                message = json.dumps(message).encode('utf-8')
+                return ((message, data['ip'], data['port']), name_list)
+                
             name_list[request['username']] = (request['ip'], request['port'])
 
     leader_ip, leader_port = leader_info
@@ -116,13 +123,16 @@ def process_request(server_socket, data, leader_info, name_list):
     return ((message, data['ip'], data['port']), name_list)
      
 
-def send_response(server_socket, response_package):
+def send_response(server_socket, response_package, name_list, leader_info):
     #TODO may want to implement retries, but probably not since this is a server 
     '''
         Simply sends the response back to the client 
     '''
     message, ip, port = response_package
     server_socket.sendto(message, (ip, port))
+    status = json.loads(message.decode('utf-8'))['status']
+    if status == 'failure':
+        check_on_users(server_socket, name_list, leader_info)
 
 
 def send_alert(username, user_info, server_socket, leader_info):
@@ -147,6 +157,7 @@ def check_on_users(server_socket, name_list, leader_info):
     '''Poll users in system to check if still alive'''
     
     # temporarily set a timeout to recieve
+    user_crash = False
     server_socket.settimeout(TIMEOUT)
     names_to_remove = []
     for key in name_list:
@@ -154,11 +165,12 @@ def check_on_users(server_socket, name_list, leader_info):
             {"purpose": "checkup"}).encode('utf-8'), name_list[key])
         try:
             data = server_socket.recv(BUFSIZ)
+            print(data)
         except socket.timeout:
-            # if a response hasnt been received before 5 seconds, 
             # send a disconnection alert and remove the username
             send_alert(key, name_list[key], server_socket, leader_info)
             names_to_remove.append(key)
+            user_crash = True
     
     # set the time back
     server_socket.settimeout(None)
@@ -166,7 +178,7 @@ def check_on_users(server_socket, name_list, leader_info):
     for key in names_to_remove:
         name_list.pop(key)
 
-    return name_list
+    return (name_list, user_crash)
 
 
 def run_server(leader_info):
@@ -199,7 +211,7 @@ def run_server(leader_info):
 
             if response_package == None:
                 continue
-            send_response(server_socket, response_package)
+            send_response(server_socket, response_package, name_list, leader_info)
         else:
             check_on_users(server_socket, name_list, leader_info)
         
