@@ -16,6 +16,7 @@ import hashlib
 import queue
 import select
 import sys
+import collections
 
 LOGIN_SERVER = ('', 9001)
 HOST = ''
@@ -201,8 +202,11 @@ class SuperUser(Base_User.Base_User):
                         self.pending_table[
                                 list(self.pending_table.keys())[0]][4] = True
                     else:
-                        self.sock.sendto(json.dumps(req).encode('utf-8'),tuple(self.neighbors['next_1']))  
-
+                        try:
+                            self.sock.sendto(json.dumps(req).encode('utf-8'),tuple(self.neighbors['next_1']))  
+                        except KeyError:
+                            print('No other users in the chat room')
+                            self.pending_table = collections.OrderedDict()
                 
 if __name__ == '__main__':
 

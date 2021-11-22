@@ -170,7 +170,11 @@ class Base_User:
         if (self.username == message["username"]):
             print(f'{message["target"]} does not exist')
             # remove transaction from pending
-            self.pending_table.pop(self.hash_data(decoded_data))
+            try:
+                self.pending_table.pop(self.hash_data(decoded_data))
+            except KeyError:
+                # value has already been popped from the table, just move on
+                print('alrady popped')
             return
 
         # check if sender does not match previous neighbor
@@ -328,7 +332,7 @@ class Base_User:
 		
 		# case where system is super user and a single user
         if self.neighbors['next_1'] == self.neighbors['prev']:
-            self.neighbors.pop('next_2')
+            self.neighbors['next_2'] = None
         
         # when super user is the only one left in the system
         if tuple(self.neighbors['next_1']) == (self.ip, self.port):
@@ -345,8 +349,21 @@ class Base_User:
             return
 
         # next node is the crashed one, start reassigning neighbors
-        self.neighbors['next_1'] = self.neighbors['next_2']
-        
+        try:
+            self.neighbors['next_1'] = self.neighbors['next_2']
+            if self.neighbors['next_2'] == None:
+                # server is the only one left in the system
+                print(self.neighbors)
+                self.neighbors = {}
+                return
+        except KeyError:
+            # catch the case where there are supposedly only two nodes in the system
+            # server is the only one left in the system
+            print(self.neighbors)
+            self.neighbors = {}
+            return 
+            
+
         # notify the prev node
         json_req = {
             "purpose": "disconnect",
