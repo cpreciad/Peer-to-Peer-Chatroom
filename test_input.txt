@@ -3,3 +3,4 @@ direct
 super_user
 Hello super_user!
 Hello again!
+disconnect

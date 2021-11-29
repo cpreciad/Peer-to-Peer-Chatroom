@@ -11,14 +11,9 @@ import User
 import time
 
 
-def test_direct():
+def test_direct(usr):
     '''Measure latency and throughput of direct messaging'''
     
-    usr = User.User("test_user1")
-    usr.print_user()
-    usr.username = f"test_user{time.time()}"
-    usr.connect()
-
     start = time.time_ns()
     elapsed = 0
     count = 0
@@ -27,7 +22,6 @@ def test_direct():
         usr.direct_message("super_user", "test message")
         usr.receive_message()
         count += 1
-
         elapsed = time.time_ns() - start
 
     print("\nPerformance of Direct Messaging:")
@@ -36,17 +30,10 @@ def test_direct():
     print(f"Bandwith (ops/sec):    {count / (elapsed / (10 ** 9)):.0f} ops/second")
     print(f"Latency (avg time/op): {(elapsed / count):.0f} nanoseconds/op\n")
     
-    usr.disconnect()
 
-
-def test_global():
+def test_global(usr):
     '''Measure latency and throughput of global messaging'''
     
-    usr = User.User("test_user1")
-    usr.print_user()
-    usr.username = f"test_user{time.time()}"
-    usr.connect()
-
     start = time.time_ns()
     elapsed = 0
     count = 0
@@ -66,14 +53,19 @@ def test_global():
     print(f"Bandwith (ops/sec):    {count / (elapsed / (10 ** 9)):.0f} ops/second")
     print(f"Latency (avg time/op): {(elapsed / count):.0f} nanoseconds/op\n")
 
-    usr.disconnect()
-
 
 def main():
     '''Runner function for performance testing'''
 
-    #test_direct();
-    test_global();
+    name = f"test_user{time.time()}"
+    usr = User.User(name)
+    usr.print_user()
+    usr.connect()
+
+    test_global(usr)
+    test_direct(usr)
+
+    usr.disconnect()
 
 
 if __name__ == '__main__':

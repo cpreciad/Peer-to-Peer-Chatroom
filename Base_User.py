@@ -107,7 +107,7 @@ class Base_User:
             - adds message to pending table and forwards to neighbor
         '''
 
-        message = {
+        json_req = {
             "username"     : self.username,
             "purpose"      : "direct",
             "message"      : message,
@@ -117,12 +117,12 @@ class Base_User:
             "message_count": self.message_count
         }
         
-        req = json.dumps(message)
+        req = json.dumps(json_req)
         encoded = req.encode('utf-8');
 
         # add transaction to pending
         self.pending_table[self.hash_data(req)] = [
-                'dirty', message, self.username, time.time(), False]
+                'dirty', json_req, self.username, time.time(), False]
 
         # forward message to neighbor
         self.sock.sendto(encoded, tuple(self.neighbors['next_1']))
@@ -132,7 +132,8 @@ class Base_User:
         '''Update pointers to accomodate new nodes'''
 
         if (purpose == "update_pointers"):
-            self.neighbors["prev"] = message["prev"]
+            if "prev" in message:
+                self.neighbors["prev"] = message["prev"]
             if self.neighbors["next_2"] == None:
                 # next next pointer is the new node
                 self.neighbors["next_2"] = message["prev"]
@@ -140,9 +141,9 @@ class Base_User:
                 self.neighbors["next_1"] = leader
     
             res = {
-                "status": "success",
+                "status"   : "success",
                 "curr_next": self.neighbors["next_1"],
-                "purpose": "update_pointers"
+                "purpose"  : "update_pointers"
             }
 
         # purpose = "update_last_node"
@@ -174,7 +175,7 @@ class Base_User:
                 self.pending_table.pop(self.hash_data(decoded_data))
             except KeyError:
                 # value has already been popped from the table, just move on
-                print('alrady popped')
+                pass
             return
 
         # check if sender does not match previous neighbor
@@ -353,13 +354,11 @@ class Base_User:
             self.neighbors['next_1'] = self.neighbors['next_2']
             if self.neighbors['next_2'] == None:
                 # server is the only one left in the system
-                print(self.neighbors)
                 self.neighbors = {}
                 return
         except KeyError:
             # catch the case where there are supposedly only two nodes in the system
             # server is the only one left in the system
-            print(self.neighbors)
             self.neighbors = {}
             return 
             
@@ -392,8 +391,13 @@ class Base_User:
     
     def display(self, message_id):
         '''Internal method to display the message with a given id'''
+        
         if message_id in self.history_table:
             return
+
+        if message_id not in self.pending_table:
+            return
+
         req = self.pending_table[message_id][1]
         username = req['username']
         message = req['message']
@@ -406,6 +410,7 @@ class Base_User:
 
         # remove from pending table
         self.pending_table.pop(message_id)
+
         # add the message_id to the history table
         self.history_table.add(message_id)
 
