@@ -18,7 +18,7 @@ import sys
 import select
 
 
-LOGIN_SERVER = ('', 9001)
+LOGIN_SERVER = ('student10.cse.nd.edu', 9001)
 BYTES = 1024
 HOST = ''
 PORT = 9907
@@ -202,11 +202,14 @@ class User(Base_User.Base_User):
         else:
             print(f"Unknown purpose: {purpose}")
 
+
     def check_pending(self):
+        '''Determine if direct messages are still pending'''
         for key in self.pending_table:
             if self.username == self.pending_table['username']:
                 return True
         return False
+
 
     def listen(self):
         '''Function to listen for incoming messages (send or receive)'''
@@ -225,8 +228,9 @@ class User(Base_User.Base_User):
                             self.disconnect()
                             sys.exit(0)
                         else:
-                            print('still processing messages, please try disconnecting later')
-                    self.send_message(usr_input)
+                            print('processing messages, please try disconnecting later')
+                    else:        
+                        self.send_message(usr_input)
 
                 # read incoming messages
                 else:

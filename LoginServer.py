@@ -80,7 +80,6 @@ def process_request(server_socket, data, leader_info, name_list):
         # invalid json; garbase request
         return (None, name_list)
    
-    print(request)
     if request['purpose'] == 'checkup':
         name_list, user_crash = check_on_users(server_socket, name_list, leader_info)
         return (None, name_list)

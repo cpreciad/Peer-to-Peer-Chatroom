@@ -55,14 +55,14 @@ class SuperUser(Base_User.Base_User):
                     print("SuperUser: Unable to retrieve next neighbor")
                     return
 
-                update = json.dumps(update).encode('utf-8')
+                update_enc = json.dumps(update).encode('utf-8')
 
                 # request current next's next neighbor
-                self.sock.sendto(update, tuple(self.neighbors["next_1"]))
+                self.sock.sendto(update_enc, tuple(self.neighbors["next_1"]))
                 up_res = self.sock.recv(BYTES)
                 json_up_res = json.loads(up_res.decode('utf-8'))
 
-                if (json_up_res["status"] == "success"):
+                if ("status" in json_up_res and json_up_res["status"] == "success"):
                     new_next_next = json_up_res["curr_next"]
                     break
 
@@ -78,11 +78,11 @@ class SuperUser(Base_User.Base_User):
                 if count >= 5:
                     return
 
-                update = json.dumps(update).encode('utf-8')
-                self.sock.sendto(update, tuple(self.neighbors["prev"]))
+                update_enc = json.dumps(update).encode('utf-8')
+                self.sock.sendto(update_enc, tuple(self.neighbors["prev"]))
                 up_res, _ = self.sock.recvfrom(BYTES)
                 json_up_res = json.loads(up_res.decode('utf-8'))
-                if (json_up_res["status"] == "success"):
+                if ("status" in json_up_res and json_up_res["status"] == "success"):
                     break
                 count += 1
 

@@ -39,7 +39,8 @@ def main():
     usr1.connect()
     
     socks = [sys.stdin, usr1.sock]
-    while True:
+    start = time.time()
+    while time.time() - start < 4:
 
         rlist, _, _ = select.select(socks, [], [], 1)
 
@@ -51,13 +52,14 @@ def main():
                 if not usr_input:
                     socks.pop(0)
                     break
-
                 else:
                     usr1.send_message(usr_input)
 
             # read incoming messages
             else:
                 usr1.receive_message()
+
+    usr1.disconnect()
 
 
 if __name__ == '__main__':
