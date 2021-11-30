@@ -59,7 +59,6 @@ class User(Base_User.Base_User):
             print(f"User {self.username} could not connect to LoginServer")
             sys.exit(-1)
           
-
         res = data.decode('utf-8')
         json_res = json.loads(res)
         try:
@@ -74,7 +73,7 @@ class User(Base_User.Base_User):
             if (json_res["error"]) == "un-unique":
                 raise Exception(f'The Username or (IP,PORT) is already in use')
             if (json_res["error"]) == "server_down":
-                raise Exception(f'Sever temporarily down, please try again soon')
+                raise Exception(f'Server temporarily down, please try again soon')
  
 
     def connect(self):
@@ -190,7 +189,8 @@ class User(Base_User.Base_User):
         elif (purpose == "checkup"):
             self.sock.sendto(json.dumps({
                 "status":"ok",
-                "purpose": "checkup_res"}).encode('utf-8'),LOGIN_SERVER)
+                "purpose": "checkup_res"
+            }).encode('utf-8'), LOGIN_SERVER)
         
         elif (purpose == "crash"):
             self.handle_crash(request)

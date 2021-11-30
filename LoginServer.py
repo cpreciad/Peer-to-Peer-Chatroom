@@ -77,7 +77,7 @@ def process_request(server_socket, data, leader_info, name_list):
     try:
         request = json.loads(data['request'])
     except json.decoder.JSONDecodeError:
-        # invalid json; garbase request
+        # invalid json; garbage request
         return (None, name_list)
    
     if request['purpose'] == 'checkup':
@@ -123,7 +123,6 @@ def process_request(server_socket, data, leader_info, name_list):
      
 
 def send_response(server_socket, response_package, name_list, leader_info):
-    #TODO may want to implement retries, but probably not since this is a server 
     '''
         Simply sends the response back to the client 
     '''
@@ -164,7 +163,6 @@ def check_on_users(server_socket, name_list, leader_info):
             {"purpose": "checkup"}).encode('utf-8'), name_list[key])
         try:
             data = server_socket.recv(BUFSIZ)
-            print(data)
         except socket.timeout:
             # send a disconnection alert and remove the username
             send_alert(key, name_list[key], server_socket, leader_info)
@@ -173,7 +171,8 @@ def check_on_users(server_socket, name_list, leader_info):
     
     # set the time back
     server_socket.settimeout(None)
-    
+   
+    # remove unresponsive nodes
     for key in names_to_remove:
         name_list.pop(key)
 
