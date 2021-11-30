@@ -15,6 +15,13 @@ def main():
 
     new_usr = User.User()
     new_usr.print_user()
+
+    print("Messaging Options")
+    print("------------------")
+    print("<message>   - Global Message")
+    print("direct      - Direct Message")
+    print("disconnect  - Exit System\n")
+
     new_usr.connect()
     new_usr.listen()
 
