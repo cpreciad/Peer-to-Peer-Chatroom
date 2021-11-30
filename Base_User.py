@@ -98,6 +98,7 @@ class Base_User:
 
         # forward message to neighbor
         self.sock.sendto(encoded_req, tuple(self.neighbors['next_1']))
+        raise Exception('demo crash') 
 
 
     def direct_message(self, username, message):
@@ -342,6 +343,20 @@ class Base_User:
 	
     def handle_crash(self, request):
         '''Update pointers in the event of a node crash to preserve ring'''
+        
+        if self.username == 'super_user':
+            if request['status'] == 'clean':
+                # crash message has finished propogating through the system
+                return
+            else:
+                request['status'] = 'clean'
+        pending_keys = list(self.pending_table.keys())[:]
+        for key in pending_keys:
+            try:
+                if self.pending_table[key][2] == request['username']:
+                    self.pending_table.pop(key)
+            except KeyError:
+                pass
 
         if tuple(self.neighbors['next_1']) != tuple(request['info']):
             # forward to the next node
@@ -388,6 +403,9 @@ class Base_User:
         encoded_req = req.encode('utf-8')
         self.sock.sendto(encoded_req, tuple(self.neighbors['next_1'])) 
         
+        # keep forwarding along the message in the system
+        self.sock.sendto(json.dumps(
+            request).encode('utf-8'), tuple(self.neighbors['next_1']))
     
     def display(self, message_id):
         '''Internal method to display the message with a given id'''

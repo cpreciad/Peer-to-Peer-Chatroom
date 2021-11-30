@@ -18,7 +18,7 @@ import sys
 import select
 
 
-LOGIN_SERVER = ('student10.cse.nd.edu', 9001)
+LOGIN_SERVER = ('', 9001)
 BYTES = 1024
 HOST = ''
 PORT = 9907
@@ -206,7 +206,7 @@ class User(Base_User.Base_User):
     def check_pending(self):
         '''Determine if direct messages are still pending'''
         for key in self.pending_table:
-            if self.username == self.pending_table['username']:
+            if self.username == self.pending_table[key][2]:
                 return True
         return False
 

@@ -142,7 +142,8 @@ def send_alert(username, user_info, server_socket, leader_info):
     json_req = {
         "purpose" : "crash",
         "username": username,
-        "info"    : user_info
+        "info"    : user_info,
+        "status"  : "dirty"
     }
 
     req = json.dumps(json_req)
