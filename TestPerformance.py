@@ -19,7 +19,7 @@ def test_direct(usr):
     count = 0
 
     while elapsed <= 3000000000:
-        usr.direct_message("super_user", "test message")
+        usr.direct_message("super_user", f"test message {count}")
         usr.receive_message()
         count += 1
         elapsed = time.time_ns() - start
