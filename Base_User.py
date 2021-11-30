@@ -325,7 +325,7 @@ class Base_User:
             if self.neighbors == {}:
                 return
             self.neighbors['next_2']  = request['next_2']
-            #TODO confirm that this is the correct message to send back
+            # confirm that this is the correct message to send back
             if request['cause'] == 'crash' and self.pending_table:
                 resumed_request = list(self.pending_table.values())[0][1]
                 req = json.dumps(resumed_request).encode('utf-8')
@@ -362,7 +362,6 @@ class Base_User:
             self.neighbors = {}
             return 
             
-
         # notify the prev node
         json_req = {
             "purpose": "disconnect",
