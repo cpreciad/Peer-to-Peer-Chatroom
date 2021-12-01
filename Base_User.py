@@ -98,7 +98,6 @@ class Base_User:
 
         # forward message to neighbor
         self.sock.sendto(encoded_req, tuple(self.neighbors['next_1']))
-        raise Exception('demo crash') 
 
 
     def direct_message(self, username, message):
