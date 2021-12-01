@@ -18,7 +18,7 @@ import select
 import sys
 import collections
 
-LOGIN_SERVER = ('', 9001)
+LOGIN_SERVER = ('student10.cse.nd.edu', 9001)
 HOST = ''
 PORT = 9060
 BYTES = 1024

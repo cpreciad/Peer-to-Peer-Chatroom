@@ -6,6 +6,10 @@
 #
 # TestPerformance.py evaluates the latency and throughput of message delivery
 
+# NOTE ABOUT PERFORMANCE:
+#   *** Comment out line 408 in Base_User.py to remove all print statements***
+#   *** Will yield the most accurate performance results ***
+
 
 import User
 import time
