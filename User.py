@@ -218,8 +218,8 @@ class User(Base_User.Base_User):
 
             rlist, _, _ = select.select([sys.stdin, self.sock], [], [], TIMEOUT)
 
-            # user entered input
             for read_s in rlist:
+
                 # read input
                 if read_s == sys.stdin:
                     usr_input = sys.stdin.readline()
@@ -235,14 +235,16 @@ class User(Base_User.Base_User):
                 # read incoming messages
                 else:
                     self.receive_message()
-
+                    
             # check if there have been timeouts for a message at top of pending queue
-            if self.pending_table:
-                top = list(self.pending_table.values())[0]
-                req  = top[1]
-                name = top[2]
-                user_time = top[3]
-                sent = top[4]
+            if not self.pending_table:
+                continue
+
+            for idx, value in enumerate(list(self.pending_table.values())):
+                req  = value[1]
+                name = value[2]
+                user_time = value[3]
+                sent = value[4]
                 
                 if time.time() - user_time > TIMEOUT and name == self.username:
                     if sent == False:
@@ -251,11 +253,9 @@ class User(Base_User.Base_User):
                         self.sock.sendto(json.dumps(
                             {"purpose":"checkup"}).encode('utf-8'), LOGIN_SERVER)
                         self.pending_table[
-                                list(self.pending_table.keys())[0]][4] = True
+                                list(self.pending_table.keys())[idx]][4] = True
                     else:
                         self.sock.sendto(json.dumps(
                             req).encode('utf-8'), tuple(self.neighbors['next_1']))
-
-
             
 
