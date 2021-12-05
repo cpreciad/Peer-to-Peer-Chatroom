@@ -16,7 +16,7 @@ import time
 import collections
 
 
-LOGIN_SERVER = ('student10.cse.nd.edu', 9001)
+LOGIN_SERVER = ('', 9001)
 BYTES = 1024
 HOST = ''
 PORT = 9907
@@ -33,14 +33,16 @@ class Base_User:
         self.history_table = set()
         self.message_count = time.time()
 
-        self.ip = socket.gethostbyname(socket.gethostname())
        
         # socket to listen for and send messages
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST,1)
+        self.ip = socket.gethostbyname(socket.gethostname())
+
 		# find a port to bind to, which is in the range from 9000-9999
         for port_num in range(9000, 10000):
             try:
-                sock.bind((HOST,port_num))
+                sock.bind((self.ip,port_num))
                 break
             except OSError:
                 continue
