@@ -18,7 +18,7 @@ import sys
 import select
 
 
-LOGIN_SERVER = ('student10.cse.nd.edu', 9001)
+LOGIN_SERVER = ('student10.cse.nd.edu', 9999)
 BYTES = 1024
 HOST = ''
 PORT = 9907
@@ -197,6 +197,10 @@ class User(Base_User.Base_User):
 
         elif (purpose == "kicked_out"):
             print("Disconnected from chat room. Please retry logging in.")
+            sys.exit(-1)
+
+        elif (purpose == "total_failure"):
+            print("Multiple users crashed. Please retry logging in.")
             sys.exit(-1)
         
         else:

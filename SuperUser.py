@@ -18,7 +18,7 @@ import select
 import sys
 import collections
 
-LOGIN_SERVER = ('student10.cse.nd.edu', 9001)
+LOGIN_SERVER = ('student10.cse.nd.edu', 9999)
 HOST = ''
 PORT = 9060
 BYTES = 1024
@@ -162,6 +162,9 @@ class SuperUser(Base_User.Base_User):
         
         elif (purpose == "crash"):
             self.handle_crash(request)
+
+        elif (purpose == "total_failure"):
+            self.neighbors = {}
         
         else:
             print(f"Unknown purpose: {purpose}")
