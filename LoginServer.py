@@ -16,8 +16,8 @@ import time
 import select
 
 # Global Variables:
-HOST = ''
-PORT = 9000
+HOST = 'student10.cse.nd.edu'
+PORT = 9999
 BUFSIZ = 4096
 
 SUPERUSER_PORT = 0 
@@ -35,11 +35,11 @@ def socket_bind():
     '''
 
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    for port in range(9000,10000):
-        try:
-            s.bind((HOST,port))
-        except OSError:
-            continue
+    try:
+        s.bind((HOST,PORT))
+    except OSError:
+        print("Port 9999 is in use")
+        sys.exit(-1)
 
     return s
 
@@ -157,25 +157,39 @@ def check_on_users(server_socket, name_list, leader_info):
     
     # temporarily set a timeout to recieve
     user_crash = False
+    total_failure = False
     server_socket.settimeout(TIMEOUT)
-    names_to_remove = []
+    name_to_remove = ""
+
     for key in name_list:
         server_socket.sendto(json.dumps(
             {"purpose": "checkup"}).encode('utf-8'), name_list[key])
         try:
             data = server_socket.recv(BUFSIZ)
         except socket.timeout:
+            # user has already crashed; total failure
+            if user_crash:
+                total_failure = True
+                break
+
             # send a disconnection alert and remove the username
             send_alert(key, name_list[key], server_socket, leader_info)
-            names_to_remove.append(key)
+            name_to_remove = key
             user_crash = True
     
     # set the time back
     server_socket.settimeout(None)
-   
-    # remove unresponsive nodes
-    for key in names_to_remove:
-        name_list.pop(key)
+
+    if total_failure:
+        failure = json.dumps({"purpose": "total_failure"}).encode('utf-8')
+        server_socket.sendto(failure, leader_info)
+        for key in name_list:
+            server_socket.sendto(failure, name_list[key])
+        name_list = {}
+    else:
+        # remove unresponsive nodes
+        if name_to_remove != "":
+            name_list.pop(name_to_remove)
 
     return (name_list, user_crash)
 
