@@ -3,6 +3,7 @@ Distributed Systems Project
 
 
 ## Initialize Service:
+(all on separate machines/terminals to model distribution network)
   - start SuperNode 
      - run ./SuperNode.py
   - start LoginServer
