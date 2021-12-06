@@ -8,7 +8,7 @@ Distributed Systems Project
   - start LoginServer
      - run on student10.cse.nd.edu assuming that the Login Server poses as a well-known service
      - note that if attempting to run the Login Server on a different machine, one must change the value of LOGIN_SERVER in User.py, Base_User.py, and SuperUser.py
-     - run ./LoginServer.py [SUPERHOST] [SUPERPORT] (where the 2 arguments are the credentials of the SuperNode)
+     - run ./LoginServer.py [SUPERHOST_IP] [SUPERPORT] (where the 2 arguments are the credentials of the SuperNode; host must be entered as the specific IP address)
   - add Users
      - run ./ChatRoom.py and enter username
      - if the User receives a message that the username or location is not unique, simply retry logging in (either the user recently crashed and the system is still remediating or the username is truly not unique)
