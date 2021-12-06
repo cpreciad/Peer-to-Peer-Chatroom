@@ -11,6 +11,8 @@ Initialize Service:
      - run ./LoginServer.py [SUPERHOST] [SUPERPORT] (where the 2 arguments are the credentials of the SuperNode)
   - add Users
      - run ./ChatRoom.py and enter username
+     - if the User receives a message that the username or location is not unique, simply retry logging in (either the user recently crashed and the system is still remediating or the username is truly not unique)
+     - if the User recevies a message saying that the system is currently remediating/recovering, simply retry logging in
  
  
 NOTE ABOUT PERFORMANCE TESTING:
