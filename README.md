@@ -22,4 +22,7 @@ Distributed Systems Project
    - it merely evaluates the speed of sending and receiving messages
    - as a result, the test user does not have the capability to listen and recover from crashed nodes
    - crashing another user in the system will not allow for system recovery because TestPerformance.py does not auto-remediate 
+- TestBasics.py likewise does not behave as a typical User
+   - functionality testing was mostly manual due to the nature of the service
+   - TestBasics.py tests the service functionality at the most basic level of sending and receiving, but likewise does not handle failures normally 
 
