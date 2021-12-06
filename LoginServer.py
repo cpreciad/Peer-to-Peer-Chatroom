@@ -111,10 +111,6 @@ def process_request(server_socket, data, leader_info, name_list):
             name_list[request['username']] = (request['ip'], request['port'])
 
     leader_ip, leader_port = leader_info
-    try:
-        leader_ip = socket.gethostbyname(socket.gethostname())
-    except socket.error:
-        pass
     
     message = {"status": "success", "leader": (leader_ip, leader_port)}
     message = json.dumps(message).encode('utf-8')
@@ -231,7 +227,7 @@ def run_server(leader_info):
 
 def usage():
 
-    print('Usage: [SUPERHOST] [SUPERPORT]')
+    print('Usage: [SUPERHOST_IP] [SUPERPORT]')
     sys.exit(0)
 
 

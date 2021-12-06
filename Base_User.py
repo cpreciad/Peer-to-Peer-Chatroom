@@ -40,7 +40,7 @@ class Base_User:
 		# find a port to bind to, which is in the range from 9000-9999
         for port_num in range(9000, 10000):
             try:
-                sock.bind((HOST,port_num))
+                sock.bind((self.ip,port_num))
                 break
             except OSError:
                 continue
