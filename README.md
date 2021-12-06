@@ -1,8 +1,8 @@
-# Peer-to-Peer-Chatroom
+## Peer-to-Peer-Chatroom
 Distributed Systems Project
 
 
-Initialize Service:
+#Initialize Service:
   - start SuperNode 
      - run ./SuperNode.py
   - start LoginServer
