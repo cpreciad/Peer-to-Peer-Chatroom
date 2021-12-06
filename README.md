@@ -1,8 +1,8 @@
-## Peer-to-Peer-Chatroom
+# Peer-to-Peer-Chatroom
 Distributed Systems Project
 
 
-#Initialize Service:
+## Initialize Service:
   - start SuperNode 
      - run ./SuperNode.py
   - start LoginServer
@@ -15,7 +15,7 @@ Distributed Systems Project
      - if the User recevies a message saying that the system is currently remediating/recovering, simply retry logging in
  
  
-NOTE ABOUT PERFORMANCE TESTING:
+## Note About Performance Testing:
 - Comment out line 425 in Base_User.py to remove all print statements
    - this step will yield the most accurate performance results
 - TestPerformance.py does not behave as a typical User
