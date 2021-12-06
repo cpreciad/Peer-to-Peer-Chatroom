@@ -20,8 +20,6 @@ HOST = 'student10.cse.nd.edu'
 PORT = 9999
 BUFSIZ = 4096
 
-SUPERUSER_PORT = 0 
-SUPERUSER_HOST = ''
 TIMEOUT = 0.1 
 
 

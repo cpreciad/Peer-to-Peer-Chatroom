@@ -18,8 +18,6 @@ import collections
 
 LOGIN_SERVER = ('student10.cse.nd.edu', 9999)
 BYTES = 1024
-HOST = ''
-PORT = 9907
 
 
 class Base_User:
