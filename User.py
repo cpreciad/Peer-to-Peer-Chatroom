@@ -73,7 +73,7 @@ class User(Base_User.Base_User):
             if (json_res["error"]) == "un-unique":
                 raise Exception(f'The Username or (IP,PORT) is already in use')
             if (json_res["error"]) == "server_down":
-                raise Exception(f'Server temporarily down, please try again soon')
+                raise Exception(f'The System currently under repair due to a crashed user. Please reconnect in a moment')
  
 
     def connect(self):
